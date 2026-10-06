@@ -43,7 +43,7 @@ export function Badge({ status }: { status: string }) {
     draft: "text-muted-foreground border-border bg-muted", pending: "text-amber border-amber/30 bg-amber/10",
     closed: "text-amber border-amber/30 bg-amber/10", rejected: "text-destructive border-destructive/30 bg-destructive/10",
   };
-  return <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-medium capitalize ${map[status] ?? map.draft}`}>{status}</span>;
+  return <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-medium capitalize ${map[status] ?? map["draft"]}`}>{status}</span>;
 }
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
