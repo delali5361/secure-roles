@@ -10,7 +10,7 @@ export type Election = {
   channels: { web: boolean; ussd: boolean }; createdAt: string;
 };
 export type CandidacyStatus = "pending" | "approved" | "rejected";
-export type Candidacy = { id: string; electionId: string; positionId: string; userId: string; manifesto: string; status: CandidacyStatus; createdAt: string; note?: string };
+export type Candidacy = { id: string; electionId: string; positionId: string; userId: string; manifesto: string; status: CandidacyStatus; createdAt: string; note?: string | undefined };
 export type Vote = { id: string; electionId: string; voterId: string; selections: Record<string, string[]>; receipt: string; channel: "web" | "ussd"; castAt: string };
 export type AuditEntry = { id: string; at: string; actor: string; action: string };
 
@@ -99,7 +99,7 @@ export const actions = {
     return u;
   },
   logout() { commit((x) => { x.session = null; }); },
-  saveElection(e: Omit<Election, "id" | "createdAt" | "status"> & { id?: string }) {
+  saveElection(e: Omit<Election, "id" | "createdAt" | "status"> & { id?: string | undefined }) {
     commit((x) => {
       const ex = x.elections.find((y) => y.id === e.id);
       if (ex) Object.assign(ex, e);
