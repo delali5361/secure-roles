@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Badge, Btn, Card, Empty, Modal, Shell, Stat } from "@/components/ui-kit";
 import { Results } from "@/components/Results";
+import { NomineeDetails } from "@/components/Nominee";
 import { actions, fmt, type DB, type Election, type User, type Vote } from "@/lib/store";
 
 export const Route = createFileRoute("/voter")({
@@ -81,6 +82,7 @@ function Ballot({ d, e, onClose, onDone }: { d: DB; e: Election; onClose: () => 
     const next = cur.includes(cid) ? cur.filter((x) => x !== cid) : max === 1 ? [cid] : cur.length < max ? [...cur, cid] : cur;
     setSel({ ...sel, [pid]: next });
   };
+  const [open, setOpen] = useState<Record<string, boolean>>({});
   const name = (cid: string) => d.users.find((u) => u.id === d.candidacies.find((c) => c.id === cid)?.userId)?.name;
   const submit = () => { try { onDone(actions.castVote(e.id, sel)); } catch (x) { setErr((x as Error).message); } };
   return (
@@ -99,8 +101,9 @@ function Ballot({ d, e, onClose, onDone }: { d: DB; e: Election; onClose: () => 
                     return (
                       <button key={c.id} onClick={() => toggle(p.id, c.id, p.maxSelections)} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${on ? "border-cyan bg-cyan/10" : "border-border bg-card hover:border-cyan/40"}`}>
                         <span className={`grid size-5 place-items-center rounded-full border ${on ? "border-cyan" : "border-border"}`}>{on && <span className="size-2.5 rounded-full bg-cyan" />}</span>
-                        <div><p className="text-[14px] font-medium">{name(c.id)}</p><p className="text-[12px] text-muted-foreground">{c.manifesto}</p></div>
+                        <div className="flex-1"><NomineeDetails c={c} u={d.users.find((u) => u.id === c.userId)} compact={!open[c.id]} /></div>
                       </button>
+                      <button onClick={() => setOpen({ ...open, [c.id]: !open[c.id] })} className="mt-1 text-[12px] text-cyan hover:underline">{open[c.id] ? "Hide profile" : "View full profile"}</button>
                     );
                   })}
                 </div>

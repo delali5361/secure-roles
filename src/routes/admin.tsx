@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Badge, Bar, Btn, Card, Empty, Field, Modal, Shell, Stat } from "@/components/ui-kit";
 import { Results } from "@/components/Results";
+import { NomineeDetails } from "@/components/Nominee";
 import { actions, fmt, newId, type DB, type Election, type ElectionStatus, type Position } from "@/lib/store";
 
 export const Route = createFileRoute("/admin")({
@@ -212,10 +213,10 @@ function Candidates({ d }: { d: DB }) {
           return (
             <div key={c.id} className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-2">
-                <div><p className="font-semibold">{u?.name}</p><p className="text-[12px] text-muted-foreground">{p?.title} · {e?.title}</p></div>
+                <p className="text-[12px] text-muted-foreground">{p?.title} · {e?.title} · {u?.email}</p>
                 <Badge status={c.status} />
               </div>
-              <p className="mt-3 text-[13px] text-muted-foreground">"{c.manifesto}"</p>
+              <div className="mt-3"><NomineeDetails c={c} u={u} /></div>
               {c.note && <p className="mt-2 text-[12px] text-amber">Note: {c.note}</p>}
               <div className="mt-4 flex gap-2">
                 {c.status !== "approved" && <Btn size="sm" onClick={() => actions.reviewCandidacy(c.id, "approved")}>Approve</Btn>}
