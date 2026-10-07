@@ -110,8 +110,8 @@ function Overview({ d, go }: { d: DB; go: (t: string) => void }) {
 
 const nextActions: Record<ElectionStatus, { to: ElectionStatus; label: string }[]> = {
   draft: [{ to: "open", label: "Open voting" }],
-  open: [{ to: "closed", label: "Close voting" }],
-  closed: [{ to: "published", label: "Publish results" }, { to: "open", label: "Reopen" }],
+  open: [],
+  closed: [{ to: "published", label: "Publish results" }],
   published: [],
 };
 

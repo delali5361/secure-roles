@@ -93,6 +93,7 @@ function Apply({ d, me, done }: { d: DB; me: User; done: () => void }) {
   const [err, setErr] = useState("");
   const submit = () => {
     if (!pos || m.trim().length < 10) return setErr("Pick a position and write at least 10 characters.");
+    if (!prof.declaration) return setErr("Please confirm the declaration at the bottom of the form.");
     try { actions.apply(e!.id, pos, m.trim(), prof); setE(null); done(); } catch (x) { setErr((x as Error).message); }
   };
   return (

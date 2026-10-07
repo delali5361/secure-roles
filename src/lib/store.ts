@@ -13,6 +13,9 @@ export type CandidacyStatus = "pending" | "approved" | "rejected";
 export type NomineeProfile = {
   photo?: string; stageName?: string; tagline?: string; bio?: string; organization?: string; location?: string;
   achievements?: string[]; reason?: string; nominatedBy?: string; videoUrl?: string; website?: string;
+  nomineeType?: "individual" | "group" | "organization"; groupMembers?: string; dob?: string; gender?: string; nationality?: string;
+  idNumber?: string; contactEmail?: string; contactPhone?: string; education?: string; occupation?: string; experienceYears?: string;
+  focusAreas?: string[]; impact?: string; references?: string; supportingDoc?: { name: string; data: string }; declaration?: boolean;
   socials?: { instagram?: string; x?: string; tiktok?: string; youtube?: string; facebook?: string; linkedin?: string };
 };
 export type Candidacy = { id: string; electionId: string; positionId: string; userId: string; manifesto: string; status: CandidacyStatus; createdAt: string; note?: string | undefined; code?: string; profile?: NomineeProfile };
@@ -49,6 +52,25 @@ function seed(): DB {
 }
 
 let db: DB | null = null;
+
+/** Voting closes automatically once the end time passes. */
+function autoClose(d: DB): boolean {
+  let changed = false;
+  for (const e of d.elections) {
+    if (e.status === "open" && new Date(e.endsAt).getTime() <= Date.now()) {
+      e.status = "closed"; changed = true;
+      d.audit.unshift({ id: uid(), at: now(), actor: "system", action: `Voting closed automatically for "${e.title}"` });
+    }
+  }
+  return changed;
+}
+if (typeof window !== "undefined") {
+  setInterval(() => {
+    if (!db) return;
+    const d = structuredClone(db);
+    if (autoClose(d)) { db = d; localStorage.setItem(KEY, JSON.stringify(d)); listeners.forEach((l) => l()); }
+  }, 15000);
+}
 const listeners = new Set<() => void>();
 
 function load(): DB {
@@ -59,6 +81,7 @@ function load(): DB {
   } catch {
     db = seed();
   }
+  autoClose(db);
   localStorage.setItem(KEY, JSON.stringify(db));
   return db;
 }
@@ -142,7 +165,7 @@ export const actions = {
   castVote(electionId: string, selections: Record<string, string[]>, channel: "web" | "ussd" = "web"): Vote {
     const d = load();
     const e = d.elections.find((x) => x.id === electionId);
-    if (!e || e.status !== "open") throw new Error("This election is not open");
+    if (!e || e.status !== "open" || new Date(e.endsAt).getTime() <= Date.now()) throw new Error("This election is not open");
     if (d.votes.some((v) => v.electionId === electionId && v.voterId === d.session)) throw new Error("You have already voted in this election");
     const v: Vote = { id: uid(), electionId, voterId: d.session!, selections, channel, castAt: now(), receipt: "RCPT-" + uid().toUpperCase() };
     commit((x) => { x.votes.push(v); }, `Ballot cast via ${channel}`);
