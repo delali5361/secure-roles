@@ -99,11 +99,11 @@ function Ballot({ d, e, onClose, onDone }: { d: DB; e: Election; onClose: () => 
                   {cands.map((c) => {
                     const on = sel[p.id]?.includes(c.id);
                     return (
-                      <button key={c.id} onClick={() => toggle(p.id, c.id, p.maxSelections)} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${on ? "border-cyan bg-cyan/10" : "border-border bg-card hover:border-cyan/40"}`}>
+                      <div key={c.id}><button onClick={() => toggle(p.id, c.id, p.maxSelections)} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${on ? "border-cyan bg-cyan/10" : "border-border bg-card hover:border-cyan/40"}`}>
                         <span className={`grid size-5 place-items-center rounded-full border ${on ? "border-cyan" : "border-border"}`}>{on && <span className="size-2.5 rounded-full bg-cyan" />}</span>
                         <div className="flex-1"><NomineeDetails c={c} u={d.users.find((u) => u.id === c.userId)} compact={!open[c.id]} /></div>
                       </button>
-                      <button onClick={() => setOpen({ ...open, [c.id]: !open[c.id] })} className="mt-1 text-[12px] text-cyan hover:underline">{open[c.id] ? "Hide profile" : "View full profile"}</button>
+                      <button onClick={() => setOpen({ ...open, [c.id]: !open[c.id] })} className="mt-1 text-[12px] text-cyan hover:underline">{open[c.id] ? "Hide profile" : "View full profile"}</button></div>
                     );
                   })}
                 </div>
