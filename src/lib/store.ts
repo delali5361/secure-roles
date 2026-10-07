@@ -10,7 +10,12 @@ export type Election = {
   channels: { web: boolean; ussd: boolean }; createdAt: string;
 };
 export type CandidacyStatus = "pending" | "approved" | "rejected";
-export type Candidacy = { id: string; electionId: string; positionId: string; userId: string; manifesto: string; status: CandidacyStatus; createdAt: string; note?: string | undefined };
+export type NomineeProfile = {
+  photo?: string; stageName?: string; tagline?: string; bio?: string; organization?: string; location?: string;
+  achievements?: string[]; reason?: string; nominatedBy?: string; videoUrl?: string; website?: string;
+  socials?: { instagram?: string; x?: string; tiktok?: string; youtube?: string; facebook?: string; linkedin?: string };
+};
+export type Candidacy = { id: string; electionId: string; positionId: string; userId: string; manifesto: string; status: CandidacyStatus; createdAt: string; note?: string | undefined; code?: string; profile?: NomineeProfile };
 export type Vote = { id: string; electionId: string; voterId: string; selections: Record<string, string[]>; receipt: string; channel: "web" | "ussd"; castAt: string };
 export type AuditEntry = { id: string; at: string; actor: string; action: string };
 
@@ -35,9 +40,9 @@ function seed(): DB {
   const p3 = { id: uid(), title: "Board Member", maxSelections: 2 };
   const e2: Election = { id: uid(), title: "Cooperative Board", organization: "Kwela Farmers Co-op", description: "Elect two members to the cooperative board.", status: "draft", positions: [p3], startsAt: days(5), endsAt: days(8), channels: { web: true, ussd: true }, createdAt: now() };
   const cand = (e: Election, p: Position, user: User, m: string, status: CandidacyStatus = "approved"): Candidacy => ({ id: uid(), electionId: e.id, positionId: p.id, userId: user.id, manifesto: m, status, createdAt: now() });
-  const k1 = cand(e1, p1, c1, "Transparent budgets and open forums every month.");
-  const k2 = cand(e1, p1, c2, "Late-night transit and better mental-health services.");
-  const k3 = cand(e1, p2, c3, "Fee freeze and digital library access for all.");
+  const k1 = { ...cand(e1, p1, c1, "Transparent budgets and open forums every month."), code: "N001", profile: { stageName: "Lerato 'The Voice' Dube", tagline: "Your voice, your council", bio: "Final-year law student and debate captain who has led three campus-wide reform campaigns.", organization: "Faculty of Law", location: "Accra", achievements: ["Debate Society captain 2024–2026", "Founded the Open Budget Forum", "Dean's List x3"], reason: "Consistently champions student transparency.", nominatedBy: "Law Students Association", socials: { instagram: "lerato.dube", x: "leratodube" } } };
+  const k2 = { ...cand(e1, p1, c2, "Late-night transit and better mental-health services."), code: "N002", profile: { tagline: "Safe campus, healthy minds", bio: "Engineering student and peer counsellor.", organization: "School of Engineering", achievements: ["Peer counsellor of the year"], socials: { tiktok: "siphonkosi" } } };
+  const k3 = { ...cand(e1, p2, c3, "Fee freeze and digital library access for all."), code: "N003", profile: { tagline: "Every cedi accounted for", bio: "Accounting major who audited three student clubs pro bono.", organization: "Business School", achievements: ["Treasurer, Finance Club"] } };
   const k4 = cand(e2, p3, c1, "Fair prices for every farmer.", "pending");
   const v: Vote = { id: uid(), electionId: e1.id, voterId: voter2.id, selections: { [p1.id]: [k2.id], [p2.id]: [k3.id] }, receipt: "RCPT-" + uid().toUpperCase(), channel: "ussd", castAt: now() };
   return { users: [admin, voter, voter2, c1, c2, c3], elections: [e1, e2], candidacies: [k1, k2, k3, k4], votes: [v], audit: [{ id: uid(), at: now(), actor: "system", action: "Platform initialized with demo data" }], session: null };
@@ -121,13 +126,15 @@ export const actions = {
   reviewCandidacy(id: string, status: CandidacyStatus, note?: string) {
     commit((x) => { const c = x.candidacies.find((y) => y.id === id); if (c) { c.status = status; c.note = note; } }, `Candidacy ${status}`);
   },
-  apply(electionId: string, positionId: string, manifesto: string) {
+  apply(electionId: string, positionId: string, manifesto: string, profile: NomineeProfile = {}) {
     const d = load();
     if (d.candidacies.some((c) => c.electionId === electionId && c.userId === d.session)) throw new Error("You already applied to this election");
-    commit((x) => { x.candidacies.push({ id: uid(), electionId, positionId, userId: x.session!, manifesto, status: "pending", createdAt: now() }); }, "Submitted candidacy application");
+    const n = d.candidacies.filter((c) => c.electionId === electionId).length + 1;
+    const code = "N" + String(n).padStart(3, "0");
+    commit((x) => { x.candidacies.push({ id: uid(), electionId, positionId, userId: x.session!, manifesto, profile, code, status: "pending", createdAt: now() }); }, "Submitted nomination");
   },
-  updateManifesto(id: string, manifesto: string) {
-    commit((x) => { const c = x.candidacies.find((y) => y.id === id); if (c) c.manifesto = manifesto; }, "Updated manifesto");
+  updateManifesto(id: string, manifesto: string, profile?: NomineeProfile) {
+    commit((x) => { const c = x.candidacies.find((y) => y.id === id); if (c) { c.manifesto = manifesto; if (profile) c.profile = profile; } }, "Updated nominee profile");
   },
   withdraw(id: string) {
     commit((x) => { x.candidacies = x.candidacies.filter((c) => c.id !== id); }, "Withdrew candidacy");
