@@ -75,16 +75,27 @@ function Home({ d, me }: { d: DB; me: User }) {
         <h1 className="mt-1 text-4xl font-bold tracking-tight">{me.name.split(" ")[0]}, {open.filter((e) => !voted(e)).length ? "your ballot is waiting." : "you're all caught up."}</h1>
         <div className="mt-6 space-y-3">
           {d.elections.filter((e) => e.status !== "draft").length === 0 && <Empty>No elections available yet.</Empty>}
-          {d.elections.filter((e) => e.status !== "draft").map((e) => (
-            <div key={e.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-card p-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2"><p className="font-semibold">{e.title}</p><Badge status={e.status} /></div>
-                <p className="text-[12px] text-muted-foreground">{e.organization} · closes {fmt(e.endsAt)}</p>
+          {d.elections.filter((e) => e.status !== "draft").map((e) => {
+            const ballots = d.votes.filter((v) => v.electionId === e.id).length;
+            const nominees = d.candidacies.filter((c) => c.electionId === e.id && c.status === "approved").length;
+            return (
+              <div key={e.id} className="rounded-xl border border-border bg-card p-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2"><p className="font-semibold">{e.title}</p><Badge status={e.status} /></div>
+                    <p className="text-[12px] text-muted-foreground">{e.organization} · closes {fmt(e.endsAt)}</p>
+                  </div>
+                  {e.status === "open" && !voted(e) && <Btn onClick={() => setBallot(e)}>Cast ballot →</Btn>}
+                  {voted(e) && <span className="text-[13px] font-medium text-mint">✓ Voted</span>}
+                  <ShareBtn e={e} />
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+                  {e.status === "open" && <Countdown endsAt={e.endsAt} />}
+                  <span className="text-[12px] text-muted-foreground">{ballots} ballot{ballots === 1 ? "" : "s"} cast · {nominees} nominee{nominees === 1 ? "" : "s"}</span>
+                </div>
               </div>
-              {e.status === "open" && !voted(e) && <Btn onClick={() => setBallot(e)}>Cast ballot →</Btn>}
-              {voted(e) && <span className="text-[13px] font-medium text-mint">✓ Voted</span>}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </Card>
       <aside className="col-span-12 flex flex-col gap-4 lg:col-span-4">
@@ -110,17 +121,24 @@ function Ballot({ d, e, onClose, onDone }: { d: DB; e: Election; onClose: () => 
     setSel({ ...sel, [pid]: next });
   };
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [compare, setCompare] = useState<Candidacy[] | null>(null);
+  const [cmpPos, setCmpPos] = useState<string | null>(null);
   const name = (cid: string) => d.users.find((u) => u.id === d.candidacies.find((c) => c.id === cid)?.userId)?.name;
   const submit = () => { try { onDone(actions.castVote(e.id, sel)); } catch (x) { setErr((x as Error).message); } };
   return (
     <Modal open onClose={onClose} title={e.title}>
       {step === "pick" ? (
         <div className="space-y-6">
+          <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2">
+            <Countdown endsAt={e.endsAt} />
+            <span className="text-[12px] text-muted-foreground">{d.votes.filter((v) => v.electionId === e.id).length} ballots cast so far</span>
+          </div>
           {e.positions.map((p) => {
             const cands = d.candidacies.filter((c) => c.electionId === e.id && c.positionId === p.id && c.status === "approved");
             return (
               <div key={p.id}>
                 <div className="mb-2 flex justify-between"><p className="font-semibold">{p.title}</p><span className="text-[12px] text-muted-foreground">Choose up to {p.maxSelections}</span></div>
+                {cands.length > 1 && <button onClick={() => { setCompare(cands); setCmpPos(p.id); }} className="mb-2 text-[12px] text-cyan hover:underline">⇄ Compare {cands.length} nominees side by side</button>}
                 {cands.length === 0 && <p className="text-[13px] text-muted-foreground">No candidates.</p>}
                 <div className="space-y-2">
                   {cands.map((c) => {
