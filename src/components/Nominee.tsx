@@ -48,6 +48,12 @@ export function NomineeDetails({ c, u, compact = false }: { c: Candidacy; u?: Us
           {!!p.achievements?.length && (
             <div><p className="label-cap mb-1">Achievements</p><ul className="space-y-1">{p.achievements.map((a, i) => <li key={i} className="flex gap-2 text-[13px]"><span className="text-amber">★</span>{a}</li>)}</ul></div>
           )}
+          {!!p.awards?.length && (
+            <div><p className="label-cap mb-1">Awards & honors</p><ul className="space-y-1">{p.awards.map((a, i) => <li key={i} className="flex gap-2 text-[13px]"><span className="text-mint">🏆</span>{a}</li>)}</ul></div>
+          )}
+          {!!p.gallery?.length && (
+            <div><p className="label-cap mb-1">Gallery</p><div className="grid grid-cols-3 gap-2">{p.gallery.map((g, i) => <img key={i} src={g} alt="" className="aspect-square w-full rounded-lg object-cover" />)}</div></div>
+          )}
           {!!p.focusAreas?.length && <div className="flex flex-wrap gap-1">{p.focusAreas.map((f) => <span key={f} className="rounded-full border border-cyan/30 bg-cyan/10 px-2 py-0.5 text-[11px] text-cyan">{f}</span>)}</div>}
           {(p.occupation || p.education || p.experienceYears || p.nationality) && <p className="text-[12px] text-muted-foreground">{[p.occupation, p.education, p.experienceYears && `${p.experienceYears} yrs experience`, p.nationality].filter(Boolean).join(" · ")}</p>}
           {p.groupMembers && <div><p className="label-cap mb-1">Members</p><p className="whitespace-pre-line text-[13px]">{p.groupMembers}</p></div>}

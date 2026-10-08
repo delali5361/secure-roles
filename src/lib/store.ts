@@ -11,7 +11,7 @@ export type Election = {
 };
 export type CandidacyStatus = "pending" | "approved" | "rejected";
 export type NomineeProfile = {
-  photo?: string; stageName?: string; tagline?: string; bio?: string; organization?: string; location?: string;
+  photo?: string; gallery?: string[]; awards?: string[]; stageName?: string; tagline?: string; bio?: string; organization?: string; location?: string;
   achievements?: string[]; reason?: string; nominatedBy?: string; videoUrl?: string; website?: string;
   nomineeType?: "individual" | "group" | "organization"; groupMembers?: string; dob?: string; gender?: string; nationality?: string;
   idNumber?: string; contactEmail?: string; contactPhone?: string; education?: string; occupation?: string; experienceYears?: string;
