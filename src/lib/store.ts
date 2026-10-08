@@ -18,7 +18,7 @@ export type NomineeProfile = {
   focusAreas?: string[]; impact?: string; references?: string; supportingDoc?: { name: string; data: string }; declaration?: boolean;
   socials?: { instagram?: string; x?: string; tiktok?: string; youtube?: string; facebook?: string; linkedin?: string };
 };
-export type Candidacy = { id: string; electionId: string; positionId: string; userId: string; manifesto: string; status: CandidacyStatus; createdAt: string; note?: string | undefined; code?: string; profile?: NomineeProfile };
+export type Candidacy = { id: string; electionId: string; positionId: string; userId: string; manifesto: string; status: CandidacyStatus; createdAt: string; note?: string | undefined; code?: string; profile?: NomineeProfile; history?: { at: string; label: string }[] };
 export type Vote = { id: string; electionId: string; voterId: string; selections: Record<string, string[]>; receipt: string; channel: "web" | "ussd"; castAt: string };
 export type AuditEntry = { id: string; at: string; actor: string; action: string };
 
@@ -147,17 +147,17 @@ export const actions = {
     commit((x) => { const e = x.elections.find((y) => y.id === id); if (e) e.status = status; }, `Election status → ${status}`);
   },
   reviewCandidacy(id: string, status: CandidacyStatus, note?: string) {
-    commit((x) => { const c = x.candidacies.find((y) => y.id === id); if (c) { c.status = status; c.note = note; } }, `Candidacy ${status}`);
+    commit((x) => { const c = x.candidacies.find((y) => y.id === id); if (c) { c.status = status; c.note = note; (c.history ??= []).push({ at: now(), label: status === "approved" ? "Approved — on the ballot" : status === "rejected" ? "Rejected" + (note ? `: ${note}` : "") : "Moved back to review" }); } }, `Candidacy ${status}`);
   },
   apply(electionId: string, positionId: string, manifesto: string, profile: NomineeProfile = {}) {
     const d = load();
     if (d.candidacies.some((c) => c.electionId === electionId && c.userId === d.session)) throw new Error("You already applied to this election");
     const n = d.candidacies.filter((c) => c.electionId === electionId).length + 1;
     const code = "N" + String(n).padStart(3, "0");
-    commit((x) => { x.candidacies.push({ id: uid(), electionId, positionId, userId: x.session!, manifesto, profile, code, status: "pending", createdAt: now() }); }, "Submitted nomination");
+    commit((x) => { x.candidacies.push({ id: uid(), electionId, positionId, userId: x.session!, manifesto, profile, code, status: "pending", createdAt: now(), history: [{ at: now(), label: "Application submitted" }] }); }, "Submitted nomination");
   },
   updateManifesto(id: string, manifesto: string, profile?: NomineeProfile) {
-    commit((x) => { const c = x.candidacies.find((y) => y.id === id); if (c) { c.manifesto = manifesto; if (profile) c.profile = profile; } }, "Updated nominee profile");
+    commit((x) => { const c = x.candidacies.find((y) => y.id === id); if (c) { c.manifesto = manifesto; if (profile) c.profile = profile; const re = c.status === "rejected"; if (re) { c.status = "pending"; c.note = undefined; } (c.history ??= []).push({ at: now(), label: re ? "Resubmitted after changes" : "Profile updated" }); } }, "Updated nominee profile");
   },
   withdraw(id: string) {
     commit((x) => { x.candidacies = x.candidacies.filter((c) => c.id !== id); }, "Withdrew candidacy");

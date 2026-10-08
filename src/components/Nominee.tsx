@@ -48,6 +48,11 @@ export function NomineeDetails({ c, u, compact = false }: { c: Candidacy; u?: Us
           {!!p.achievements?.length && (
             <div><p className="label-cap mb-1">Achievements</p><ul className="space-y-1">{p.achievements.map((a, i) => <li key={i} className="flex gap-2 text-[13px]"><span className="text-amber">★</span>{a}</li>)}</ul></div>
           )}
+          {!!p.focusAreas?.length && <div className="flex flex-wrap gap-1">{p.focusAreas.map((f) => <span key={f} className="rounded-full border border-cyan/30 bg-cyan/10 px-2 py-0.5 text-[11px] text-cyan">{f}</span>)}</div>}
+          {(p.occupation || p.education || p.experienceYears || p.nationality) && <p className="text-[12px] text-muted-foreground">{[p.occupation, p.education, p.experienceYears && `${p.experienceYears} yrs experience`, p.nationality].filter(Boolean).join(" · ")}</p>}
+          {p.groupMembers && <div><p className="label-cap mb-1">Members</p><p className="whitespace-pre-line text-[13px]">{p.groupMembers}</p></div>}
+          {p.impact && <div><p className="label-cap mb-1">Impact</p><p className="text-[13px]">{p.impact}</p></div>}
+          {p.supportingDoc && <a href={p.supportingDoc.data} download={p.supportingDoc.name} className="inline-block text-[12px] text-cyan">📎 {p.supportingDoc.name}</a>}
           {p.reason && <div><p className="label-cap mb-1">Why nominated</p><p className="text-[13px] text-muted-foreground">{p.reason}</p></div>}
           {p.nominatedBy && <p className="text-[12px] text-muted-foreground">Nominated by <span className="text-foreground">{p.nominatedBy}</span></p>}
           <div className="flex flex-wrap gap-2">
@@ -74,6 +79,13 @@ export function NomineeForm({ manifesto, setManifesto, profile, setProfile }: { 
     r.onload = () => set("photo", r.result as string);
     r.readAsDataURL(f);
   };
+  const onDoc = (f?: File) => {
+    if (!f) return;
+    if (f.size > 2e6) return alert("Please pick a file under 2 MB.");
+    const r = new FileReader();
+    r.onload = () => set("supportingDoc", { name: f.name, data: r.result as string });
+    r.readAsDataURL(f);
+  };
   return (
     <div className="space-y-5">
       <Section title="Identity">
@@ -94,6 +106,23 @@ export function NomineeForm({ manifesto, setManifesto, profile, setProfile }: { 
           <Field label="Location"><input className="field" value={profile.location ?? ""} onChange={(e) => set("location", e.target.value)} /></Field>
         </div>
       </Section>
+      <Section title="Nominee details">
+        <Field label="Nominee type"><select className="field" value={profile.nomineeType ?? "individual"} onChange={(e) => set("nomineeType", e.target.value as NomineeProfile["nomineeType"])}><option value="individual">Individual</option><option value="group">Group / band / team</option><option value="organization">Organization</option></select></Field>
+        {profile.nomineeType && profile.nomineeType !== "individual" && <Field label="Members / representatives"><textarea rows={2} className="field" value={profile.groupMembers ?? ""} onChange={(e) => set("groupMembers", e.target.value)} placeholder="One name per line" /></Field>}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Contact email *"><input type="email" className="field" value={profile.contactEmail ?? ""} onChange={(e) => set("contactEmail", e.target.value)} /></Field>
+          <Field label="Contact phone *"><input className="field" value={profile.contactPhone ?? ""} onChange={(e) => set("contactPhone", e.target.value)} placeholder="+233…" /></Field>
+          {(profile.nomineeType ?? "individual") === "individual" && <>
+            <Field label="Date of birth"><input type="date" className="field" value={profile.dob ?? ""} onChange={(e) => set("dob", e.target.value)} /></Field>
+            <Field label="Gender"><select className="field" value={profile.gender ?? ""} onChange={(e) => set("gender", e.target.value)}><option value="">Prefer not to say</option><option>Female</option><option>Male</option><option>Non-binary</option></select></Field>
+          </>}
+          <Field label="Nationality"><input className="field" value={profile.nationality ?? ""} onChange={(e) => set("nationality", e.target.value)} /></Field>
+          <Field label="ID / student / registration no."><input className="field" value={profile.idNumber ?? ""} onChange={(e) => set("idNumber", e.target.value)} /></Field>
+          <Field label="Education"><input className="field" value={profile.education ?? ""} onChange={(e) => set("education", e.target.value)} /></Field>
+          <Field label="Occupation"><input className="field" value={profile.occupation ?? ""} onChange={(e) => set("occupation", e.target.value)} /></Field>
+          <Field label="Years of experience"><input type="number" min={0} max={80} className="field" value={profile.experienceYears ?? ""} onChange={(e) => set("experienceYears", e.target.value)} /></Field>
+        </div>
+      </Section>
       <Section title="Story">
         <Field label="Short bio"><textarea rows={3} maxLength={400} className="field" value={profile.bio ?? ""} onChange={(e) => set("bio", e.target.value)} placeholder="Who are you, in a few lines?" /></Field>
         <Field label="Manifesto / pitch *"><textarea rows={4} className="field" value={manifesto} onChange={(e) => setManifesto(e.target.value)} placeholder="Why should people vote for you?" /></Field>
@@ -111,6 +140,17 @@ export function NomineeForm({ manifesto, setManifesto, profile, setProfile }: { 
           ))}
         </div>
       </Section>
+      <Section title="Impact">
+        <div className="flex flex-wrap gap-2">
+          {FOCUS.map((f) => { const on = profile.focusAreas?.includes(f); return <button key={f} type="button" onClick={() => set("focusAreas", on ? profile.focusAreas!.filter((x) => x !== f) : [...(profile.focusAreas ?? []), f])} className={`rounded-full border px-3 py-1 text-[12px] ${on ? "border-cyan/40 bg-cyan/10 text-cyan" : "border-border bg-card text-muted-foreground"}`}>{f}</button>; })}
+        </div>
+        <Field label="Impact in the last 12 months"><textarea rows={3} maxLength={600} className="field" value={profile.impact ?? ""} onChange={(e) => set("impact", e.target.value)} placeholder="Numbers, results, people reached…" /></Field>
+        <Field label="References"><textarea rows={2} className="field" value={profile.references ?? ""} onChange={(e) => set("references", e.target.value)} placeholder="Name · relationship · contact" /></Field>
+        <div className="flex items-center gap-3">
+          <label className="inline-flex cursor-pointer rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] hover:bg-accent">Upload supporting document<input type="file" accept=".pdf,image/*" className="hidden" onChange={(e) => onDoc(e.target.files?.[0])} /></label>
+          {profile.supportingDoc && <span className="text-[12px]">📎 {profile.supportingDoc.name} <button className="ml-1 text-destructive" onClick={() => set("supportingDoc", undefined)}>✕</button></span>}
+        </div>
+      </Section>
       <Section title="Media & socials">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Pitch video link"><input className="field" value={profile.videoUrl ?? ""} onChange={(e) => set("videoUrl", e.target.value)} placeholder="https://youtube.com/…" /></Field>
@@ -120,6 +160,53 @@ export function NomineeForm({ manifesto, setManifesto, profile, setProfile }: { 
           ))}
         </div>
       </Section>
+      <label className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-[13px]">
+        <input type="checkbox" className="mt-0.5" checked={!!profile.declaration} onChange={(e) => set("declaration", e.target.checked)} />
+        <span>I confirm the information above is true and I accept the rules of this election. *</span>
+      </label>
+    </div>
+  );
+}
+
+const FOCUS = ["Leadership", "Innovation", "Community", "Arts & culture", "Sports", "Education", "Business", "Technology", "Health", "Environment"];
+
+/** Returns a list of problems; empty means valid. */
+export function validateNominee(manifesto: string, p: NomineeProfile): string[] {
+  const e: string[] = [];
+  const url = (s?: string) => !s || /^https?:\/\/[^\s.]+\.[^\s]+$/.test(s);
+  if (manifesto.trim().length < 30) e.push("Manifesto / pitch must be at least 30 characters.");
+  if (!p.contactEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.contactEmail)) e.push("Enter a valid contact email.");
+  if (!p.contactPhone || !/^\+?[0-9 ()-]{7,20}$/.test(p.contactPhone)) e.push("Enter a valid contact phone number.");
+  if (p.dob) { const age = (Date.now() - new Date(p.dob).getTime()) / 31557600000; if (age < 13 || age > 120) e.push("Date of birth looks wrong (must be 13+)."); }
+  if (p.experienceYears && (isNaN(+p.experienceYears) || +p.experienceYears < 0)) e.push("Years of experience must be a positive number.");
+  if (p.nomineeType && p.nomineeType !== "individual" && !p.groupMembers?.trim()) e.push("List the group's members or representatives.");
+  if (!p.bio || p.bio.trim().length < 20) e.push("Write a short bio (20+ characters).");
+  if (!url(p.website)) e.push("Website must start with http:// or https://");
+  if (!url(p.videoUrl)) e.push("Pitch video link must start with http:// or https://");
+  if (!p.declaration) e.push("Tick the declaration at the bottom of the form.");
+  return e;
+}
+
+/** Visual tracker of an application's progress. */
+export function StatusTracker({ c }: { c: Candidacy }) {
+  const steps = ["Submitted", "Under review", c.status === "rejected" ? "Rejected" : "Approved"];
+  const at = c.status === "pending" ? 1 : 2;
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        {steps.map((s, i) => (
+          <div key={s} className="flex flex-1 items-center gap-2">
+            <div className={`grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-bold ${i < at || (i === at && c.status !== "pending") ? (c.status === "rejected" && i === 2 ? "bg-destructive text-destructive-foreground" : "bg-mint text-background") : i === at ? "border-2 border-amber text-amber" : "border border-border text-muted-foreground"}`}>{i + 1}</div>
+            <span className="text-[12px]">{s}</span>
+            {i < 2 && <div className={`h-px flex-1 ${i < at ? "bg-mint" : "bg-border"}`} />}
+          </div>
+        ))}
+      </div>
+      {!!c.history?.length && (
+        <ul className="space-y-1 border-l border-border pl-3">
+          {[...c.history].reverse().map((h, i) => <li key={i} className="text-[12px]"><span className="text-muted-foreground">{new Date(h.at).toLocaleString()}</span> · {h.label}</li>)}
+        </ul>
+      )}
     </div>
   );
 }
