@@ -48,6 +48,12 @@ export function NomineeDetails({ c, u, compact = false }: { c: Candidacy; u?: Us
           {!!p.achievements?.length && (
             <div><p className="label-cap mb-1">Achievements</p><ul className="space-y-1">{p.achievements.map((a, i) => <li key={i} className="flex gap-2 text-[13px]"><span className="text-amber">★</span>{a}</li>)}</ul></div>
           )}
+          {!!p.awards?.length && (
+            <div><p className="label-cap mb-1">Awards & honors</p><ul className="space-y-1">{p.awards.map((a, i) => <li key={i} className="flex gap-2 text-[13px]"><span className="text-mint">🏆</span>{a}</li>)}</ul></div>
+          )}
+          {!!p.gallery?.length && (
+            <div><p className="label-cap mb-1">Gallery</p><div className="grid grid-cols-3 gap-2">{p.gallery.map((g, i) => <img key={i} src={g} alt="" className="aspect-square w-full rounded-lg object-cover" />)}</div></div>
+          )}
           {!!p.focusAreas?.length && <div className="flex flex-wrap gap-1">{p.focusAreas.map((f) => <span key={f} className="rounded-full border border-cyan/30 bg-cyan/10 px-2 py-0.5 text-[11px] text-cyan">{f}</span>)}</div>}
           {(p.occupation || p.education || p.experienceYears || p.nationality) && <p className="text-[12px] text-muted-foreground">{[p.occupation, p.education, p.experienceYears && `${p.experienceYears} yrs experience`, p.nationality].filter(Boolean).join(" · ")}</p>}
           {p.groupMembers && <div><p className="label-cap mb-1">Members</p><p className="whitespace-pre-line text-[13px]">{p.groupMembers}</p></div>}
@@ -71,6 +77,7 @@ export function NomineeDetails({ c, u, compact = false }: { c: Candidacy; u?: Us
 /** Editable nominee profile form. */
 export function NomineeForm({ manifesto, setManifesto, profile, setProfile }: { manifesto: string; setManifesto: (s: string) => void; profile: NomineeProfile; setProfile: (p: NomineeProfile) => void }) {
   const [ach, setAch] = useState("");
+  const [awd, setAwd] = useState("");
   const set = <K extends keyof NomineeProfile>(k: K, v: NomineeProfile[K]) => setProfile({ ...profile, [k]: v });
   const onPhoto = (f?: File) => {
     if (!f) return;
@@ -78,6 +85,17 @@ export function NomineeForm({ manifesto, setManifesto, profile, setProfile }: { 
     const r = new FileReader();
     r.onload = () => set("photo", r.result as string);
     r.readAsDataURL(f);
+  };
+  const onGallery = (files: FileList | null) => {
+    if (!files?.length) return;
+    const cur = profile.gallery ?? [];
+    if (cur.length + files.length > 6) return alert("Up to 6 gallery photos.");
+    for (const f of Array.from(files)) {
+      if (f.size > 1.5e6) { alert(`"${f.name}" is over 1.5 MB — skipped.`); continue; }
+      const r = new FileReader();
+      r.onload = () => setProfile({ ...profile, gallery: [...(profile.gallery ?? []), r.result as string] });
+      r.readAsDataURL(f);
+    }
   };
   const onDoc = (f?: File) => {
     if (!f) return;
@@ -139,6 +157,35 @@ export function NomineeForm({ manifesto, setManifesto, profile, setProfile }: { 
             <span key={i} className="inline-flex items-center gap-2 rounded-full border border-amber/30 bg-amber/10 px-3 py-1 text-[12px] text-amber">★ {a}<button onClick={() => set("achievements", profile.achievements!.filter((_, j) => j !== i))} aria-label="Remove">✕</button></span>
           ))}
         </div>
+      </Section>
+      <Section title="Awards & honors">
+        <div className="flex gap-2">
+          <input className="field" value={awd} onChange={(e) => setAwd(e.target.value)} placeholder="e.g. Ghana Music Awards — Best New Act" onKeyDown={(e) => { if (e.key === "Enter" && awd.trim()) { e.preventDefault(); set("awards", [...(profile.awards ?? []), awd.trim()]); setAwd(""); } }} />
+          <button className="shrink-0 rounded-lg border border-border bg-card px-3 text-[12px] hover:bg-accent" onClick={() => { if (awd.trim()) { set("awards", [...(profile.awards ?? []), awd.trim()]); setAwd(""); } }}>Add</button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {profile.awards?.map((a, i) => (
+            <span key={i} className="inline-flex items-center gap-2 rounded-full border border-mint/30 bg-mint/10 px-3 py-1 text-[12px] text-mint">🏆 {a}<button onClick={() => set("awards", profile.awards!.filter((_, j) => j !== i))} aria-label="Remove">✕</button></span>
+          ))}
+        </div>
+      </Section>
+      <Section title="Photo gallery">
+        <div className="flex items-center gap-3">
+          <label className="inline-flex cursor-pointer rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] hover:bg-accent">
+            Add photos<input type="file" accept="image/*" multiple className="hidden" onChange={(e) => onGallery(e.target.files)} />
+          </label>
+          <p className="text-[11px] text-muted-foreground">Up to 6 photos · 1.5 MB each</p>
+        </div>
+        {!!profile.gallery?.length && (
+          <div className="grid grid-cols-3 gap-2">
+            {profile.gallery.map((g, i) => (
+              <div key={i} className="group relative">
+                <img src={g} alt="" className="aspect-square w-full rounded-lg object-cover" />
+                <button onClick={() => set("gallery", profile.gallery!.filter((_, j) => j !== i))} className="absolute right-1 top-1 grid size-5 place-items-center rounded-full bg-background/80 text-[11px] text-destructive opacity-0 transition group-hover:opacity-100" aria-label="Remove photo">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
       </Section>
       <Section title="Impact">
         <div className="flex flex-wrap gap-2">
