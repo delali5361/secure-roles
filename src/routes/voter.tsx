@@ -1,9 +1,36 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { Badge, Btn, Card, Empty, Modal, Shell, Stat } from "@/components/ui-kit";
+import { useEffect, useState } from "react";
+import { Badge, Bar, Btn, Card, Empty, Modal, Shell, Stat } from "@/components/ui-kit";
 import { Results } from "@/components/Results";
-import { NomineeDetails } from "@/components/Nominee";
-import { actions, fmt, type DB, type Election, type User, type Vote } from "@/lib/store";
+import { Avatar, NomineeDetails, displayName } from "@/components/Nominee";
+import { actions, fmt, type Candidacy, type DB, type Election, type User, type Vote } from "@/lib/store";
+
+/** Live countdown to the end of voting. */
+function Countdown({ endsAt }: { endsAt: string }) {
+  const [left, setLeft] = useState(() => new Date(endsAt).getTime() - Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setLeft(new Date(endsAt).getTime() - Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [endsAt]);
+  if (left <= 0) return <span className="font-mono text-[12px] text-amber">Closing…</span>;
+  const s = Math.floor(left / 1000);
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  const txt = d > 0 ? `${d}d ${h}h ${m}m` : `${h}h ${m}m ${String(sec).padStart(2, "0")}s`;
+  return <span className={`font-mono text-[12px] ${left < 3600e3 ? "text-amber" : "text-mint"}`}>⏱ {txt} left</span>;
+}
+
+/** Copies a share link for the election. */
+function ShareBtn({ e }: { e: Election }) {
+  const [copied, setCopied] = useState(false);
+  const share = async () => {
+    const text = `Vote in "${e.title}" (${e.organization}) on Ballotglass — closes ${fmt(e.endsAt)}`;
+    try {
+      if (navigator.share) await navigator.share({ title: e.title, text, url: location.origin });
+      else { await navigator.clipboard.writeText(`${text} · ${location.origin}`); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    } catch { /* dismissed */ }
+  };
+  return <Btn size="sm" variant="ghost" onClick={share}>{copied ? "✓ Copied" : "↗ Share"}</Btn>;
+}
 
 export const Route = createFileRoute("/voter")({
   head: () => ({
