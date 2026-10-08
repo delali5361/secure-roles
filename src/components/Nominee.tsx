@@ -48,6 +48,11 @@ export function NomineeDetails({ c, u, compact = false }: { c: Candidacy; u?: Us
           {!!p.achievements?.length && (
             <div><p className="label-cap mb-1">Achievements</p><ul className="space-y-1">{p.achievements.map((a, i) => <li key={i} className="flex gap-2 text-[13px]"><span className="text-amber">★</span>{a}</li>)}</ul></div>
           )}
+          {!!p.focusAreas?.length && <div className="flex flex-wrap gap-1">{p.focusAreas.map((f) => <span key={f} className="rounded-full border border-cyan/30 bg-cyan/10 px-2 py-0.5 text-[11px] text-cyan">{f}</span>)}</div>}
+          {(p.occupation || p.education || p.experienceYears || p.nationality) && <p className="text-[12px] text-muted-foreground">{[p.occupation, p.education, p.experienceYears && `${p.experienceYears} yrs experience`, p.nationality].filter(Boolean).join(" · ")}</p>}
+          {p.groupMembers && <div><p className="label-cap mb-1">Members</p><p className="whitespace-pre-line text-[13px]">{p.groupMembers}</p></div>}
+          {p.impact && <div><p className="label-cap mb-1">Impact</p><p className="text-[13px]">{p.impact}</p></div>}
+          {p.supportingDoc && <a href={p.supportingDoc.data} download={p.supportingDoc.name} className="inline-block text-[12px] text-cyan">📎 {p.supportingDoc.name}</a>}
           {p.reason && <div><p className="label-cap mb-1">Why nominated</p><p className="text-[13px] text-muted-foreground">{p.reason}</p></div>}
           {p.nominatedBy && <p className="text-[12px] text-muted-foreground">Nominated by <span className="text-foreground">{p.nominatedBy}</span></p>}
           <div className="flex flex-wrap gap-2">
