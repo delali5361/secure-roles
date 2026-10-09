@@ -99,7 +99,6 @@ function commit(fn: (d: DB) => void, audit?: string) {
     d.audit.unshift({ id: uid(), at: now(), actor, action: audit });
     d.audit = d.audit.slice(0, 200);
   }
-  db = d;
   try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { throw new Error("This browser's storage is full. Remove some uploaded media and try again."); }
   db = d;
   listeners.forEach((l) => l());
