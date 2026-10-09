@@ -79,8 +79,8 @@ function Mine({ d, me, go }: { d: DB; me: User; go: (t: string) => void }) {
         <Stat label="Votes received" value={d.votes.reduce((s, v) => s + Object.values(v.selections).flat().filter((id) => mine.some((c) => c.id === id)).length, 0)} hint="Across all elections" tone="cyan" />
       </aside>
       <Modal open={!!edit} onClose={() => setEdit(null)} title="Edit nominee profile">
-        <NomineeForm manifesto={text} setManifesto={setText} profile={prof} setProfile={setProf} />
-        <div className="mt-4 flex justify-end gap-2"><Btn variant="ghost" onClick={() => setEdit(null)}>Cancel</Btn><Btn onClick={() => { const er = validateNominee(text, prof); if (er.length) return setEditErr(er.join("\n")); setEditErr(""); actions.updateManifesto(edit!.id, text, prof); setEdit(null); }}>Save</Btn></div>
+        <NomineeForm manifesto={text} setManifesto={setText} profile={prof} setProfile={setProf} questions={d.elections.find((e) => e.id === edit?.electionId)?.questions} />
+        <div className="mt-4 flex justify-end gap-2"><Btn variant="ghost" onClick={() => setEdit(null)}>Cancel</Btn><Btn onClick={() => { if (!edit) return; const er = validateNominee(text, prof, d.elections.find((e) => e.id === edit.electionId)?.questions); if (er.length) return setEditErr(er.join("\n")); try { actions.updateManifesto(edit.id, text, prof); setEditErr(""); setEdit(null); } catch (e) { setEditErr((e as Error).message); } }}>Save</Btn></div>
         {editErr && <p className="mt-3 whitespace-pre-line text-[13px] text-destructive">{editErr}</p>}
       </Modal>
     </div>
@@ -95,10 +95,11 @@ function Apply({ d, me, done }: { d: DB; me: User; done: () => void }) {
   const [prof, setProf] = useState<NomineeProfile>({});
   const [err, setErr] = useState("");
   const submit = () => {
+    if (!e) return;
     if (!pos) return setErr("Pick a position.");
-    const errs = validateNominee(m, prof);
+    const errs = validateNominee(m, prof, e.questions);
     if (errs.length) return setErr(errs.join("\n"));
-    try { actions.apply(e!.id, pos, m.trim(), prof); setE(null); done(); } catch (x) { setErr((x as Error).message); }
+    try { actions.apply(e.id, pos, m.trim(), prof); setE(null); done(); } catch (x) { setErr((x as Error).message); }
   };
   return (
     <Card>
@@ -111,16 +112,18 @@ function Apply({ d, me, done }: { d: DB; me: User; done: () => void }) {
             <p className="mt-1 text-[12px] text-muted-foreground">{x.organization}</p>
             <p className="mt-2 text-[13px] text-muted-foreground">{x.description}</p>
             <p className="mt-2 text-[12px]">{x.positions.map((p) => p.title).join(" · ")}</p>
-            <Btn size="sm" className="mt-4" onClick={() => { setE(x); setPos(x.positions[0]?.id ?? ""); setM(""); setProf({ contactEmail: me.email, contactPhone: me.phone, nomineeType: "individual" }); setErr(""); }}>Apply</Btn>
+            {(d.drafts ?? []).find((draft) => draft.electionId === x.id && draft.userId === me.id) && <p className="mt-3 text-xs text-amber">Draft saved · {fmt((d.drafts ?? []).find((draft) => draft.electionId === x.id && draft.userId === me.id)?.updatedAt ?? "")}</p>}
+            <Btn size="sm" className="mt-4" onClick={() => { const draft = (d.drafts ?? []).find((draft) => draft.electionId === x.id && draft.userId === me.id); setE(x); setPos(draft?.positionId ?? x.positions[0]?.id ?? ""); setM(draft?.manifesto ?? ""); setProf(draft?.profile ?? { contactEmail: me.email, contactPhone: me.phone, nomineeType: "individual" }); setErr(""); }}>{(d.drafts ?? []).some((draft) => draft.electionId === x.id && draft.userId === me.id) ? "Continue draft" : "Apply"}</Btn>
+            {(d.drafts ?? []).some((draft) => draft.electionId === x.id && draft.userId === me.id) && <Btn size="sm" variant="danger" className="ml-2 mt-4" onClick={() => confirm("Discard this draft?") && actions.deleteDraft(x.id)}>Discard</Btn>}
           </div>
         ))}
       </div>
       <Modal open={!!e} onClose={() => setE(null)} title={`Apply · ${e?.title ?? ""}`}>
         <div className="space-y-4">
           <Field label="Category / position"><select className="field" value={pos} onChange={(x) => setPos(x.target.value)}>{e?.positions.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}</select></Field>
-          <NomineeForm manifesto={m} setManifesto={setM} profile={prof} setProfile={setProf} />
+          <NomineeForm manifesto={m} setManifesto={setM} profile={prof} setProfile={setProf} questions={e?.questions} />
           {err && <p className="whitespace-pre-line rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-[13px] text-destructive">{err}</p>}
-          <div className="flex justify-end gap-2"><Btn variant="ghost" onClick={() => setE(null)}>Cancel</Btn><Btn onClick={submit}>Submit application</Btn></div>
+          <div className="flex flex-wrap justify-end gap-2"><Btn variant="ghost" onClick={() => setE(null)}>Cancel</Btn><Btn variant="soft" onClick={() => { if (!e) return; try { actions.saveDraft(e.id, pos, m, prof); setE(null); } catch (x) { setErr((x as Error).message); } }}>Save draft</Btn><Btn onClick={submit}>Submit application</Btn></div>
         </div>
       </Modal>
     </Card>

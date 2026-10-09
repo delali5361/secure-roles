@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Badge, Bar, Btn, Card, Empty, Field, Modal, Shell, Stat } from "@/components/ui-kit";
 import { Results } from "@/components/Results";
 import { NomineeDetails } from "@/components/Nominee";
-import { actions, fmt, newId, type DB, type Election, type ElectionStatus, type Position } from "@/lib/store";
+import { actions, fmt, newId, type ApplicationQuestion, type DB, type Election, type ElectionStatus, type Position } from "@/lib/store";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -135,7 +135,7 @@ function Elections({ d }: { d: DB }) {
             <div className="flex flex-wrap gap-2">
               {nextActions[e.status].map((a) => <Btn key={a.to} size="sm" onClick={() => actions.setStatus(e.id, a.to)}>{a.label}</Btn>)}
               {e.status === "draft" && <Btn size="sm" variant="ghost" onClick={() => setEdit(e)}>Edit</Btn>}
-              <Btn size="sm" variant="danger" onClick={() => confirm(`Delete "${e.title}"?`) && actions.deleteElection(e.id)}>Delete</Btn>
+              {e.status !== "open" && <Btn size="sm" variant="danger" onClick={() => confirm(`Delete "${e.title}"?`) && actions.deleteElection(e.id)}>Delete</Btn>}
             </div>
           </div>
         ))}
@@ -153,11 +153,13 @@ function ElectionForm({ initial, onClose }: { initial: Election | null; onClose:
   });
   const [positions, setPositions] = useState<Position[]>(initial?.positions ?? [{ id: newId(), title: "President", maxSelections: 1 }]);
   const [err, setErr] = useState("");
+  const [questions, setQuestions] = useState<ApplicationQuestion[]>(initial?.questions ?? []);
   const save = () => {
     if (!f.title.trim()) return setErr("Title is required");
     if (new Date(f.endsAt) <= new Date(f.startsAt)) return setErr("End must be after start");
     if (!positions.length || positions.some((p) => !p.title.trim())) return setErr("Add at least one named position");
-    actions.saveElection({ ...f, positions, id: initial?.id });
+    if (questions.some((q) => !q.label.trim())) return setErr("Give every application question a label.");
+    actions.saveElection({ ...f, positions, questions, id: initial?.id });
     onClose();
   };
   return (
@@ -188,6 +190,7 @@ function ElectionForm({ initial, onClose }: { initial: Election | null; onClose:
           </div>
           <Btn variant="soft" size="sm" className="mt-2" onClick={() => setPositions([...positions, { id: newId(), title: "", maxSelections: 1 }])}>+ Add position</Btn>
         </div>
+        <div className="space-y-3"><h3 className="text-sm font-semibold">Application questions</h3>{questions.map((q) => <div key={q.id} className="space-y-2"><input aria-label="Question" className="field" value={q.label} placeholder="What makes your work stand out?" onChange={(e) => setQuestions(questions.map((x) => x.id === q.id ? { ...x, label: e.target.value } : x))} /><div className="flex items-center justify-between"><label className="flex gap-2 text-xs"><input type="checkbox" checked={q.required} onChange={(e) => setQuestions(questions.map((x) => x.id === q.id ? { ...x, required: e.target.checked } : x))} /> Required</label><Btn size="sm" variant="danger" onClick={() => setQuestions(questions.filter((x) => x.id !== q.id))}>Remove question</Btn></div></div>)}<Btn size="sm" variant="soft" onClick={() => setQuestions([...questions, { id: newId(), label: "", required: false }])}>+ Add question</Btn></div>
         {err && <p className="text-[13px] text-destructive">{err}</p>}
         <div className="flex justify-end gap-2"><Btn variant="ghost" onClick={onClose}>Cancel</Btn><Btn onClick={save}>Save</Btn></div>
       </div>
@@ -217,6 +220,7 @@ function Candidates({ d }: { d: DB }) {
                 <Badge status={c.status} />
               </div>
               <div className="mt-3"><NomineeDetails c={c} u={u} /></div>
+              {!!e?.questions?.length && <div className="mt-3 space-y-2">{e.questions.map((q) => <div key={q.id}><p className="label-cap">{q.label}</p><p className="text-sm">{c.profile?.answers?.[q.id] || "Not answered"}</p></div>)}</div>}
               {c.note && <p className="mt-2 text-[12px] text-amber">Note: {c.note}</p>}
               <div className="mt-4 flex gap-2">
                 {c.status !== "approved" && <Btn size="sm" onClick={() => actions.reviewCandidacy(c.id, "approved")}>Approve</Btn>}
