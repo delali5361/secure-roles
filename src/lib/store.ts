@@ -3,11 +3,12 @@ import { useSyncExternalStore } from "react";
 export type Role = "admin" | "voter" | "candidate";
 export type User = { id: string; name: string; email: string; phone: string; password: string; role: Role; createdAt: string };
 export type Position = { id: string; title: string; maxSelections: number };
+export type ApplicationQuestion = { id: string; label: string; required: boolean };
 export type ElectionStatus = "draft" | "open" | "closed" | "published";
 export type Election = {
   id: string; title: string; organization: string; description: string;
   status: ElectionStatus; positions: Position[]; startsAt: string; endsAt: string;
-  channels: { web: boolean; ussd: boolean }; createdAt: string;
+  channels: { web: boolean; ussd: boolean }; createdAt: string; questions?: ApplicationQuestion[];
 };
 export type CandidacyStatus = "pending" | "approved" | "rejected";
 export type NomineeProfile = {
@@ -17,12 +18,16 @@ export type NomineeProfile = {
   idNumber?: string; contactEmail?: string; contactPhone?: string; education?: string; occupation?: string; experienceYears?: string;
   focusAreas?: string[]; impact?: string; references?: string; supportingDoc?: { name: string; data: string }; declaration?: boolean;
   socials?: { instagram?: string; x?: string; tiktok?: string; youtube?: string; facebook?: string; linkedin?: string };
+  video?: { name: string; data: string }; answers?: Record<string, string>;
 };
 export type Candidacy = { id: string; electionId: string; positionId: string; userId: string; manifesto: string; status: CandidacyStatus; createdAt: string; note?: string | undefined; code?: string; profile?: NomineeProfile; history?: { at: string; label: string }[] };
 export type Vote = { id: string; electionId: string; voterId: string; selections: Record<string, string[]>; receipt: string; channel: "web" | "ussd"; castAt: string };
 export type AuditEntry = { id: string; at: string; actor: string; action: string };
+export type ApplicationDraft = { electionId: string; userId: string; positionId: string; manifesto: string; profile: NomineeProfile; updatedAt: string };
+export type Comment = { id: string; candidacyId: string; userId: string; body: string; createdAt: string };
+export type Reaction = { candidacyId: string; userId: string };
 
-export type DB = { users: User[]; elections: Election[]; candidacies: Candidacy[]; votes: Vote[]; audit: AuditEntry[]; session: string | null };
+export type DB = { users: User[]; elections: Election[]; candidacies: Candidacy[]; votes: Vote[]; audit: AuditEntry[]; session: string | null; drafts?: ApplicationDraft[]; comments?: Comment[]; reactions?: Reaction[] };
 
 const KEY = "ballotglass.db.v1";
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -95,7 +100,8 @@ function commit(fn: (d: DB) => void, audit?: string) {
     d.audit = d.audit.slice(0, 200);
   }
   db = d;
-  localStorage.setItem(KEY, JSON.stringify(d));
+  try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { throw new Error("This browser's storage is full. Remove some uploaded media and try again."); }
+  db = d;
   listeners.forEach((l) => l());
 }
 
@@ -135,6 +141,8 @@ export const actions = {
     }, `${e.id ? "Updated" : "Created"} election "${e.title}"`);
   },
   deleteElection(id: string) {
+    const e = load().elections.find((x) => x.id === id);
+    if (e?.status === "open") throw new Error("An active election cannot be deleted before voting ends.");
     commit((x) => {
       const t = x.elections.find((e) => e.id === id)?.title;
       x.elections = x.elections.filter((e) => e.id !== id);
@@ -144,6 +152,12 @@ export const actions = {
     });
   },
   setStatus(id: string, status: ElectionStatus) {
+    const d = load();
+    const e = d.elections.find((x) => x.id === id);
+    if (!e) throw new Error("Election not found");
+    if (e.status === "open" && new Date(e.endsAt).getTime() <= Date.now()) commit((x) => { autoClose(x); });
+    const current = load().elections.find((x) => x.id === id);
+    if (!current || !((current.status === "draft" && status === "open" && new Date(current.endsAt).getTime() > Date.now()) || (current.status === "closed" && status === "published"))) throw new Error("Voting ends automatically at the deadline. Only draft elections can open and closed elections can publish.");
     commit((x) => { const e = x.elections.find((y) => y.id === id); if (e) e.status = status; }, `Election status → ${status}`);
   },
   reviewCandidacy(id: string, status: CandidacyStatus, note?: string) {
@@ -151,10 +165,15 @@ export const actions = {
   },
   apply(electionId: string, positionId: string, manifesto: string, profile: NomineeProfile = {}) {
     const d = load();
+    const user = currentUser(d);
+    const election = d.elections.find((e) => e.id === electionId);
+    if (!user || user.role !== "candidate") throw new Error("Sign in as a candidate to apply.");
+    if (!election || !["draft", "open"].includes(election.status) || !election.positions.some((p) => p.id === positionId)) throw new Error("This application is unavailable.");
+    if (election.questions?.some((q) => q.required && !profile.answers?.[q.id]?.trim())) throw new Error("Answer all required election questions.");
     if (d.candidacies.some((c) => c.electionId === electionId && c.userId === d.session)) throw new Error("You already applied to this election");
     const n = d.candidacies.filter((c) => c.electionId === electionId).length + 1;
     const code = "N" + String(n).padStart(3, "0");
-    commit((x) => { x.candidacies.push({ id: uid(), electionId, positionId, userId: x.session!, manifesto, profile, code, status: "pending", createdAt: now(), history: [{ at: now(), label: "Application submitted" }] }); }, "Submitted nomination");
+    commit((x) => { x.candidacies.push({ id: uid(), electionId, positionId, userId: user.id, manifesto, profile, code, status: "pending", createdAt: now(), history: [{ at: now(), label: "Application submitted" }] }); x.drafts = (x.drafts ?? []).filter((v) => !(v.electionId === electionId && v.userId === user.id)); }, "Submitted nomination");
   },
   updateManifesto(id: string, manifesto: string, profile?: NomineeProfile) {
     commit((x) => { const c = x.candidacies.find((y) => y.id === id); if (c) { c.manifesto = manifesto; if (profile) c.profile = profile; const re = c.status === "rejected"; if (re) { c.status = "pending"; c.note = undefined; } (c.history ??= []).push({ at: now(), label: re ? "Resubmitted after changes" : "Profile updated" }); } }, "Updated nominee profile");
@@ -164,14 +183,40 @@ export const actions = {
   },
   castVote(electionId: string, selections: Record<string, string[]>, channel: "web" | "ussd" = "web"): Vote {
     const d = load();
+    const user = currentUser(d);
+    if (!user || user.role !== "voter") throw new Error("Sign in as a voter to cast a ballot.");
     const e = d.elections.find((x) => x.id === electionId);
     if (!e || e.status !== "open" || new Date(e.endsAt).getTime() <= Date.now()) throw new Error("This election is not open");
     if (d.votes.some((v) => v.electionId === electionId && v.voterId === d.session)) throw new Error("You have already voted in this election");
-    const v: Vote = { id: uid(), electionId, voterId: d.session!, selections, channel, castAt: now(), receipt: "RCPT-" + uid().toUpperCase() };
+    if (!e.channels[channel]) throw new Error("This voting channel is unavailable.");
+    for (const [pid, ids] of Object.entries(selections)) {
+      const p = e.positions.find((x) => x.id === pid);
+      if (!p || ids.length > p.maxSelections || new Set(ids).size !== ids.length || ids.some((id) => !d.candidacies.some((c) => c.id === id && c.electionId === e.id && c.positionId === pid && c.status === "approved"))) throw new Error("Invalid ballot selections.");
+    }
+    const v: Vote = { id: uid(), electionId, voterId: user.id, selections, channel, castAt: now(), receipt: "RCPT-" + uid().toUpperCase() };
     commit((x) => { x.votes.push(v); }, `Ballot cast via ${channel}`);
     return v;
   },
   deleteUser(id: string) { commit((x) => { x.users = x.users.filter((u) => u.id !== id); }, "Removed a user"); },
+  saveDraft(electionId: string, positionId: string, manifesto: string, profile: NomineeProfile) {
+    const user = currentUser(load());
+    if (!user || user.role !== "candidate") throw new Error("Sign in as a candidate.");
+    commit((x) => { x.drafts = (x.drafts ?? []).filter((v) => !(v.electionId === electionId && v.userId === user.id)); x.drafts.push({ electionId, positionId, manifesto, profile, userId: user.id, updatedAt: now() }); });
+  },
+  deleteDraft(electionId: string) { commit((x) => { x.drafts = (x.drafts ?? []).filter((v) => !(v.electionId === electionId && v.userId === x.session)); }); },
+  addComment(candidacyId: string, body: string) {
+    const d = load(); const user = currentUser(d);
+    if (!user) throw new Error("Sign in to comment.");
+    if (!body.trim() || body.trim().length > 500) throw new Error("Comments must contain 1–500 characters.");
+    if (!d.candidacies.some((c) => c.id === candidacyId && c.status === "approved")) throw new Error("Nominee unavailable.");
+    commit((x) => { (x.comments ??= []).push({ id: uid(), candidacyId, userId: user.id, body: body.trim(), createdAt: now() }); });
+  },
+  deleteComment(id: string) { commit((x) => { x.comments = (x.comments ?? []).filter((c) => c.id !== id || (c.userId !== x.session && currentUser(x)?.role !== "admin")); }); },
+  toggleReaction(candidacyId: string) {
+    const d = load(); const user = currentUser(d);
+    if (!user || !d.candidacies.some((c) => c.id === candidacyId && c.status === "approved")) throw new Error("Sign in to support an approved nominee.");
+    commit((x) => { const existing = (x.reactions ?? []).some((r) => r.candidacyId === candidacyId && r.userId === user.id); x.reactions = (x.reactions ?? []).filter((r) => !(r.candidacyId === candidacyId && r.userId === user.id)); if (!existing) x.reactions.push({ candidacyId, userId: user.id }); });
+  },
   reset() { db = seed(); localStorage.setItem(KEY, JSON.stringify(db)); listeners.forEach((l) => l()); },
 };
 
