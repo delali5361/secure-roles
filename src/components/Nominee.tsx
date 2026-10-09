@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Field } from "@/components/ui-kit";
-import type { Candidacy, NomineeProfile, User } from "@/lib/store";
+import { Btn, Field } from "@/components/ui-kit";
+import type { ApplicationQuestion, Candidacy, NomineeProfile, User } from "@/lib/store";
 
 const SOCIALS = [
   ["instagram", "Instagram", "https://instagram.com/"],
@@ -58,12 +58,13 @@ export function NomineeDetails({ c, u, compact = false }: { c: Candidacy; u?: Us
           {(p.occupation || p.education || p.experienceYears || p.nationality) && <p className="text-[12px] text-muted-foreground">{[p.occupation, p.education, p.experienceYears && `${p.experienceYears} yrs experience`, p.nationality].filter(Boolean).join(" · ")}</p>}
           {p.groupMembers && <div><p className="label-cap mb-1">Members</p><p className="whitespace-pre-line text-[13px]">{p.groupMembers}</p></div>}
           {p.impact && <div><p className="label-cap mb-1">Impact</p><p className="text-[13px]">{p.impact}</p></div>}
+          {p.video && <video controls preload="metadata" src={p.video.data} className="aspect-video w-full rounded-lg" />}
           {p.supportingDoc && <a href={p.supportingDoc.data} download={p.supportingDoc.name} className="inline-block text-[12px] text-cyan">📎 {p.supportingDoc.name}</a>}
           {p.reason && <div><p className="label-cap mb-1">Why nominated</p><p className="text-[13px] text-muted-foreground">{p.reason}</p></div>}
           {p.nominatedBy && <p className="text-[12px] text-muted-foreground">Nominated by <span className="text-foreground">{p.nominatedBy}</span></p>}
           <div className="flex flex-wrap gap-2">
             {socials.map(([k, label, base]) => (
-              <a key={k} href={base + p.socials![k]!.replace(/^@/, "")} target="_blank" rel="noreferrer" className="rounded-full border border-border bg-card px-3 py-1 text-[12px] hover:border-cyan/40">{label} · @{p.socials![k]!.replace(/^@/, "")}</a>
+              <a key={k} href={base + (p.socials?.[k] ?? "").replace(/^@/, "")} target="_blank" rel="noreferrer" className="rounded-full border border-border bg-card px-3 py-1 text-[12px] hover:border-cyan/40">{label} · @{(p.socials?.[k] ?? "").replace(/^@/, "")}</a>
             ))}
             {p.website && <a href={p.website} target="_blank" rel="noreferrer" className="rounded-full border border-border bg-card px-3 py-1 text-[12px] hover:border-cyan/40">Website ↗</a>}
             {p.videoUrl && <a href={p.videoUrl} target="_blank" rel="noreferrer" className="rounded-full border border-cyan/30 bg-cyan/10 px-3 py-1 text-[12px] text-cyan">▶ Watch pitch video</a>}
@@ -75,7 +76,7 @@ export function NomineeDetails({ c, u, compact = false }: { c: Candidacy; u?: Us
 }
 
 /** Editable nominee profile form. */
-export function NomineeForm({ manifesto, setManifesto, profile, setProfile }: { manifesto: string; setManifesto: (s: string) => void; profile: NomineeProfile; setProfile: (p: NomineeProfile) => void }) {
+export function NomineeForm({ manifesto, setManifesto, profile, setProfile, questions = [] }: { manifesto: string; setManifesto: (s: string) => void; profile: NomineeProfile; setProfile: (p: NomineeProfile) => void; questions?: ApplicationQuestion[] }) {
   const [ach, setAch] = useState("");
   const [awd, setAwd] = useState("");
   const set = <K extends keyof NomineeProfile>(k: K, v: NomineeProfile[K]) => setProfile({ ...profile, [k]: v });
@@ -86,16 +87,14 @@ export function NomineeForm({ manifesto, setManifesto, profile, setProfile }: { 
     r.onload = () => set("photo", r.result as string);
     r.readAsDataURL(f);
   };
-  const onGallery = (files: FileList | null) => {
+  const onGallery = async (files: FileList | null) => {
     if (!files?.length) return;
     const cur = profile.gallery ?? [];
     if (cur.length + files.length > 6) return alert("Up to 6 gallery photos.");
-    for (const f of Array.from(files)) {
-      if (f.size > 1.5e6) { alert(`"${f.name}" is over 1.5 MB — skipped.`); continue; }
-      const r = new FileReader();
-      r.onload = () => setProfile({ ...profile, gallery: [...(profile.gallery ?? []), r.result as string] });
-      r.readAsDataURL(f);
-    }
+    const valid = Array.from(files).filter((f) => f.type.startsWith("image/") && f.size <= 1.5e6);
+    if (valid.length !== files.length) alert("Only images under 1.5 MB can be added.");
+    const photos = await Promise.all(valid.map((f) => new Promise<string>((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.onerror = () => reject(new Error("Image could not be read")); r.readAsDataURL(f); })));
+    setProfile({ ...profile, gallery: [...cur, ...photos] });
   };
   const onDoc = (f?: File) => {
     if (!f) return;
@@ -199,6 +198,8 @@ export function NomineeForm({ manifesto, setManifesto, profile, setProfile }: { 
         </div>
       </Section>
       <Section title="Media & socials">
+        <Field label="Upload pitch video"><input type="file" accept="video/mp4,video/webm" className="field" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; if (!["video/mp4", "video/webm"].includes(file.type) || file.size > 1.5e6) { alert("Choose an MP4 or WebM video under 1.5 MB, or use a video link instead."); return; } const reader = new FileReader(); reader.onload = () => set("video", { name: file.name, data: String(reader.result) }); reader.readAsDataURL(file); }} /></Field>
+        {profile.video && <div className="flex items-center justify-between gap-2 text-xs"><span className="truncate">{profile.video.name}</span><Btn size="sm" variant="danger" onClick={() => set("video", undefined)}>Remove video</Btn></div>}
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Pitch video link"><input className="field" value={profile.videoUrl ?? ""} onChange={(e) => set("videoUrl", e.target.value)} placeholder="https://youtube.com/…" /></Field>
           <Field label="Website / portfolio"><input className="field" value={profile.website ?? ""} onChange={(e) => set("website", e.target.value)} placeholder="https://" /></Field>
@@ -207,6 +208,7 @@ export function NomineeForm({ manifesto, setManifesto, profile, setProfile }: { 
           ))}
         </div>
       </Section>
+      {!!questions.length && <Section title="Election questions">{questions.map((q) => <Field key={q.id} label={`${q.label}${q.required ? " *" : ""}`}><textarea className="field" rows={3} value={profile.answers?.[q.id] ?? ""} onChange={(e) => set("answers", { ...profile.answers, [q.id]: e.target.value })} /></Field>)}</Section>}
       <label className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-[13px]">
         <input type="checkbox" className="mt-0.5" checked={!!profile.declaration} onChange={(e) => set("declaration", e.target.checked)} />
         <span>I confirm the information above is true and I accept the rules of this election. *</span>
@@ -218,19 +220,20 @@ export function NomineeForm({ manifesto, setManifesto, profile, setProfile }: { 
 const FOCUS = ["Leadership", "Innovation", "Community", "Arts & culture", "Sports", "Education", "Business", "Technology", "Health", "Environment"];
 
 /** Returns a list of problems; empty means valid. */
-export function validateNominee(manifesto: string, p: NomineeProfile): string[] {
+export function validateNominee(manifesto: string, p: NomineeProfile, questions: ApplicationQuestion[] = []): string[] {
   const e: string[] = [];
   const url = (s?: string) => !s || /^https?:\/\/[^\s.]+\.[^\s]+$/.test(s);
   if (manifesto.trim().length < 30) e.push("Manifesto / pitch must be at least 30 characters.");
   if (!p.contactEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.contactEmail)) e.push("Enter a valid contact email.");
   if (!p.contactPhone || !/^\+?[0-9 ()-]{7,20}$/.test(p.contactPhone)) e.push("Enter a valid contact phone number.");
-  if (p.dob) { const age = (Date.now() - new Date(p.dob).getTime()) / 31557600000; if (age < 13 || age > 120) e.push("Date of birth looks wrong (must be 13+)."); }
+  if (p.dob) { const age = (Date.now() - new Date(p.dob).getTime()) / 31557600000; if (!Number.isFinite(age) || age < 13 || age > 120) e.push("Date of birth looks wrong (must be 13+)."); }
   if (p.experienceYears && (isNaN(+p.experienceYears) || +p.experienceYears < 0)) e.push("Years of experience must be a positive number.");
   if (p.nomineeType && p.nomineeType !== "individual" && !p.groupMembers?.trim()) e.push("List the group's members or representatives.");
   if (!p.bio || p.bio.trim().length < 20) e.push("Write a short bio (20+ characters).");
   if (!url(p.website)) e.push("Website must start with http:// or https://");
   if (!url(p.videoUrl)) e.push("Pitch video link must start with http:// or https://");
   if (!p.declaration) e.push("Tick the declaration at the bottom of the form.");
+  questions.forEach((q) => { if (q.required && !p.answers?.[q.id]?.trim()) e.push(`Answer: ${q.label}`); });
   return e;
 }
 

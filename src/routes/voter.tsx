@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { Badge, Bar, Btn, Card, Empty, Modal, Shell, Stat } from "@/components/ui-kit";
 import { Results } from "@/components/Results";
 import { Avatar, NomineeDetails, displayName } from "@/components/Nominee";
+import { NomineeDiscussion } from "@/components/NomineeDiscussion";
+import { ArrowLeft, Columns2 } from "lucide-react";
 import { actions, fmt, type Candidacy, type DB, type Election, type User, type Vote } from "@/lib/store";
 
 /** Live countdown to the end of voting. */
@@ -22,14 +24,15 @@ function Countdown({ endsAt }: { endsAt: string }) {
 /** Copies a share link for the election. */
 function ShareBtn({ e }: { e: Election }) {
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState("");
   const share = async () => {
     const text = `Vote in "${e.title}" (${e.organization}) on Ballotglass — closes ${fmt(e.endsAt)}`;
     try {
       if (navigator.share) await navigator.share({ title: e.title, text, url: location.origin });
       else { await navigator.clipboard.writeText(`${text} · ${location.origin}`); setCopied(true); setTimeout(() => setCopied(false), 2000); }
-    } catch { /* dismissed */ }
+    } catch (e) { if ((e as Error).name !== "AbortError") setError("Sharing unavailable in this browser."); }
   };
-  return <Btn size="sm" variant="ghost" onClick={share}>{copied ? "✓ Copied" : "↗ Share"}</Btn>;
+  return <div><Btn size="sm" variant="ghost" onClick={share}>{copied ? "✓ Copied" : "↗ Share"}</Btn>{error && <p className="text-xs text-destructive">{error}</p>}</div>;
 }
 
 export const Route = createFileRoute("/voter")({
@@ -85,7 +88,7 @@ function Home({ d, me }: { d: DB; me: User }) {
                     <div className="flex items-center gap-2"><p className="font-semibold">{e.title}</p><Badge status={e.status} /></div>
                     <p className="text-[12px] text-muted-foreground">{e.organization} · closes {fmt(e.endsAt)}</p>
                   </div>
-                  {e.status === "open" && !voted(e) && <Btn onClick={() => setBallot(e)}>Cast ballot →</Btn>}
+                  {e.status === "open" && e.channels.web && !voted(e) && <Btn onClick={() => setBallot(e)}>Cast ballot →</Btn>}
                   {voted(e) && <span className="text-[13px] font-medium text-mint">✓ Voted</span>}
                   <ShareBtn e={e} />
                 </div>
@@ -127,7 +130,7 @@ function Ballot({ d, e, onClose, onDone }: { d: DB; e: Election; onClose: () => 
   const submit = () => { try { onDone(actions.castVote(e.id, sel)); } catch (x) { setErr((x as Error).message); } };
   return (
     <Modal open onClose={onClose} title={e.title}>
-      {step === "pick" ? (
+      {compare ? <div className="space-y-4"><Btn variant="ghost" size="sm" onClick={() => { setCompare(null); setCmpPos(null); }}><ArrowLeft size={14} /> Back to ballot</Btn><h3 className="font-semibold">Compare · {e.positions.find((p) => p.id === cmpPos)?.title}</h3><div className="grid gap-4 sm:grid-cols-2">{compare.map((c) => <section key={c.id} className="min-w-0 space-y-3 border-t border-border pt-3"><NomineeDetails c={c} u={d.users.find((u) => u.id === c.userId)} /><Btn className="w-full" variant={cmpPos && sel[cmpPos]?.includes(c.id) ? "soft" : "brand"} onClick={() => { const p = e.positions.find((p) => p.id === cmpPos); if (p) toggle(p.id, c.id, p.maxSelections); }}>{cmpPos && sel[cmpPos]?.includes(c.id) ? "Selected ✓" : "Select nominee"}</Btn></section>)}</div></div> : step === "pick" ? (
         <div className="space-y-6">
           <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2">
             <Countdown endsAt={e.endsAt} />
@@ -138,17 +141,17 @@ function Ballot({ d, e, onClose, onDone }: { d: DB; e: Election; onClose: () => 
             return (
               <div key={p.id}>
                 <div className="mb-2 flex justify-between"><p className="font-semibold">{p.title}</p><span className="text-[12px] text-muted-foreground">Choose up to {p.maxSelections}</span></div>
-                {cands.length > 1 && <button onClick={() => { setCompare(cands); setCmpPos(p.id); }} className="mb-2 text-[12px] text-cyan hover:underline">⇄ Compare {cands.length} nominees side by side</button>}
+                {cands.length > 1 && <Btn variant="ghost" size="sm" onClick={() => { setCompare(cands); setCmpPos(p.id); }} className="mb-2"><Columns2 size={14} /> Compare {cands.length} nominees</Btn>}
                 {cands.length === 0 && <p className="text-[13px] text-muted-foreground">No candidates.</p>}
                 <div className="space-y-2">
                   {cands.map((c) => {
                     const on = sel[p.id]?.includes(c.id);
                     return (
-                      <div key={c.id}><button onClick={() => toggle(p.id, c.id, p.maxSelections)} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${on ? "border-cyan bg-cyan/10" : "border-border bg-card hover:border-cyan/40"}`}>
+                      <div key={c.id}><Btn variant="ghost" aria-pressed={!!on} onClick={() => toggle(p.id, c.id, p.maxSelections)} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${on ? "border-cyan bg-cyan/10" : "border-border bg-card hover:border-cyan/40"}`}>
                         <span className={`grid size-5 place-items-center rounded-full border ${on ? "border-cyan" : "border-border"}`}>{on && <span className="size-2.5 rounded-full bg-cyan" />}</span>
-                        <div className="flex-1"><NomineeDetails c={c} u={d.users.find((u) => u.id === c.userId)} compact={!open[c.id]} /></div>
-                      </button>
-                      <button onClick={() => setOpen({ ...open, [c.id]: !open[c.id] })} className="mt-1 text-[12px] text-cyan hover:underline">{open[c.id] ? "Hide profile" : "View full profile"}</button></div>
+                        <div className="flex-1"><NomineeDetails c={c} u={d.users.find((u) => u.id === c.userId)} compact /></div>
+                      </Btn>
+                      <Btn variant="ghost" size="sm" onClick={() => setOpen({ ...open, [c.id]: !open[c.id] })} className="mt-1">{open[c.id] ? "Hide profile" : "View full profile"}</Btn>{open[c.id] && <div className="mt-3 border-l border-border pl-3"><NomineeDetails c={c} u={d.users.find((u) => u.id === c.userId)} /><NomineeDiscussion d={d} candidacyId={c.id} /></div>}</div>
                     );
                   })}
                 </div>
