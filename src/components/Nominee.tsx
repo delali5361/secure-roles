@@ -76,7 +76,7 @@ export function NomineeDetails({ c, u, compact = false }: { c: Candidacy; u?: Us
 }
 
 /** Editable nominee profile form. */
-export function NomineeForm({ manifesto, setManifesto, profile, setProfile, questions = [] }: { manifesto: string; setManifesto: (s: string) => void; profile: NomineeProfile; setProfile: (p: NomineeProfile) => void; questions?: ApplicationQuestion[] }) {
+export function NomineeForm({ manifesto, setManifesto, profile, setProfile, questions = [] }: { manifesto: string; setManifesto: (s: string) => void; profile: NomineeProfile; setProfile: (p: NomineeProfile) => void; questions?: ApplicationQuestion[] | undefined }) {
   const [ach, setAch] = useState("");
   const [awd, setAwd] = useState("");
   const set = <K extends keyof NomineeProfile>(k: K, v: NomineeProfile[K]) => setProfile({ ...profile, [k]: v });
