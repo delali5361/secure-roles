@@ -195,6 +195,7 @@ export const actions = {
     if (!e.channels[channel]) throw new Error("This voting channel is unavailable.");
     for (const [pid, ids] of Object.entries(selections)) {
       const p = e.positions.find((x) => x.id === pid);
+      if (p && isPaid(p) && ids.length) throw new Error(`"${p.title}" is a paid category — buy votes for it separately.`);
       if (!p || ids.length > p.maxSelections || new Set(ids).size !== ids.length || ids.some((id) => !d.candidacies.some((c) => c.id === id && c.electionId === e.id && c.positionId === pid && c.status === "approved"))) throw new Error("Invalid ballot selections.");
     }
     const v: Vote = { id: uid(), electionId, voterId: user.id, selections, channel, castAt: now(), receipt: "RCPT-" + uid().toUpperCase() };
@@ -221,18 +222,41 @@ export const actions = {
     if (!user || !d.candidacies.some((c) => c.id === candidacyId && c.status === "approved")) throw new Error("Sign in to support an approved nominee.");
     commit((x) => { const existing = (x.reactions ?? []).some((r) => r.candidacyId === candidacyId && r.userId === user.id); x.reactions = (x.reactions ?? []).filter((r) => !(r.candidacyId === candidacyId && r.userId === user.id)); if (!existing) x.reactions.push({ candidacyId, userId: user.id }); });
   },
+  /** Simulated Paystack payment: records the payment and adds `quantity` votes for one nominee in a paid category. */
+  buyVotes(input: { electionId: string; positionId: string; candidacyId: string; quantity: number; method: "card" | "momo" }): Payment {
+    const d = load();
+    const user = currentUser(d);
+    if (!user || user.role !== "voter") throw new Error("Sign in as a voter to buy votes.");
+    const e = d.elections.find((x) => x.id === input.electionId);
+    if (!e || e.status !== "open" || new Date(e.endsAt).getTime() <= Date.now()) throw new Error("Voting has closed for this election.");
+    if (!e.channels.web) throw new Error("This voting channel is unavailable.");
+    const p = e.positions.find((x) => x.id === input.positionId);
+    if (!p || !isPaid(p)) throw new Error("This category does not accept paid votes.");
+    if (!d.candidacies.some((c) => c.id === input.candidacyId && c.electionId === e.id && c.positionId === p.id && c.status === "approved")) throw new Error("Nominee unavailable.");
+    const q = Math.floor(input.quantity);
+    if (!Number.isFinite(q) || q < 1 || q > MAX_VOTES_PER_PAYMENT) throw new Error(`Choose between 1 and ${MAX_VOTES_PER_PAYMENT} votes.`);
+    const unitPrice = p.price ?? 0;
+    const pay: Payment = { id: uid(), reference: "PSK-" + uid().toUpperCase(), electionId: e.id, positionId: p.id, candidacyId: input.candidacyId, voterId: user.id, quantity: q, unitPrice, amount: Math.round(q * unitPrice * 100) / 100, currency: "GHS", method: input.method, status: "success", paidAt: now() };
+    commit((x) => { (x.payments ??= []).push(pay); }, `Paid ${ghs(pay.amount)} for ${q} vote${q === 1 ? "" : "s"} (${pay.reference})`);
+    return pay;
+  },
   reset() { db = seed(); localStorage.setItem(KEY, JSON.stringify(db)); listeners.forEach((l) => l()); },
 };
 
 export function tally(d: DB, e: Election) {
   const votes = d.votes.filter((v) => v.electionId === e.id);
+  const pays = (d.payments ?? []).filter((p) => p.electionId === e.id);
   return e.positions.map((p) => {
     const cands = d.candidacies.filter((c) => c.electionId === e.id && c.positionId === p.id && c.status === "approved");
-    const rows = cands.map((c) => ({ c, user: d.users.find((u) => u.id === c.userId), count: votes.filter((v) => v.selections[p.id]?.includes(c.id)).length }));
+    const rows = cands.map((c) => ({ c, user: d.users.find((u) => u.id === c.userId), count: isPaid(p) ? pays.filter((x) => x.candidacyId === c.id).reduce((s, x) => s + x.quantity, 0) : votes.filter((v) => v.selections[p.id]?.includes(c.id)).length }));
     rows.sort((a, b) => b.count - a.count);
     const total = rows.reduce((s, r) => s + r.count, 0);
     return { position: p, rows, total };
   });
+}
+
+export function revenue(d: DB, electionId?: string) {
+  return (d.payments ?? []).filter((p) => !electionId || p.electionId === electionId).reduce((s, p) => s + p.amount, 0);
 }
 
 export const dashFor = (r: Role) => (r === "admin" ? "/admin" : r === "voter" ? "/voter" : "/candidate") as "/admin" | "/voter" | "/candidate";
