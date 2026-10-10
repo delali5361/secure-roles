@@ -5,7 +5,8 @@ import { Results } from "@/components/Results";
 import { Avatar, NomineeDetails, displayName } from "@/components/Nominee";
 import { NomineeDiscussion } from "@/components/NomineeDiscussion";
 import { ArrowLeft, Columns2 } from "lucide-react";
-import { actions, fmt, type Candidacy, type DB, type Election, type User, type Vote } from "@/lib/store";
+import { BuyVotes } from "@/components/PaidVote";
+import { actions, fmt, ghs, isPaid, type Candidacy, type DB, type Election, type Position, type User, type Vote } from "@/lib/store";
 
 /** Live countdown to the end of voting. */
 function Countdown({ endsAt }: { endsAt: string }) {
@@ -88,8 +89,10 @@ function Home({ d, me }: { d: DB; me: User }) {
                     <div className="flex items-center gap-2"><p className="font-semibold">{e.title}</p><Badge status={e.status} /></div>
                     <p className="text-[12px] text-muted-foreground">{e.organization} · closes {fmt(e.endsAt)}</p>
                   </div>
-                  {e.status === "open" && e.channels.web && !voted(e) && <Btn onClick={() => setBallot(e)}>Cast ballot →</Btn>}
+                  {e.status === "open" && e.channels.web && !voted(e) && <Btn onClick={() => setBallot(e)}>{e.positions.every(isPaid) ? "Buy votes →" : "Cast ballot →"}</Btn>}
+                  {e.status === "open" && e.channels.web && voted(e) && e.positions.some(isPaid) && <Btn variant="soft" onClick={() => setBallot(e)}>Buy more votes →</Btn>}
                   {voted(e) && <span className="text-[13px] font-medium text-mint">✓ Voted</span>}
+                  {e.positions.some(isPaid) && <span className="rounded-full border border-amber/40 px-2 py-0.5 text-[11px] text-amber">Paid voting</span>}
                   <ShareBtn e={e} />
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -106,7 +109,7 @@ function Home({ d, me }: { d: DB; me: User }) {
         <Stat label="Ballots cast" value={mine.length} hint="Receipts saved" tone="cyan" />
         <Stat label="Phone" value={<span className="text-xl">{me.phone}</span>} hint="Used for SMS & USSD" tone="amber" />
       </aside>
-      {ballot && <Ballot d={d} e={ballot} onClose={() => setBallot(null)} onDone={(v) => { setBallot(null); setReceipt(v); }} />}
+      {ballot && <Ballot d={d} e={ballot} me={me} voted={voted(ballot)} onClose={() => setBallot(null)} onDone={(v) => { setBallot(null); setReceipt(v); }} />}
       <Modal open={!!receipt} onClose={() => setReceipt(null)} title="Ballot sealed">
         {receipt && <ReceiptView v={receipt} d={d} />}
       </Modal>
@@ -114,10 +117,13 @@ function Home({ d, me }: { d: DB; me: User }) {
   );
 }
 
-function Ballot({ d, e, onClose, onDone }: { d: DB; e: Election; onClose: () => void; onDone: (v: Vote) => void }) {
+function Ballot({ d, e, me, voted, onClose, onDone }: { d: DB; e: Election; me: User; voted: boolean; onClose: () => void; onDone: (v: Vote) => void }) {
   const [sel, setSel] = useState<Record<string, string[]>>({});
   const [step, setStep] = useState<"pick" | "review">("pick");
   const [err, setErr] = useState("");
+  const [buy, setBuy] = useState<{ p: Position; c: Candidacy } | null>(null);
+  const [paidMsg, setPaidMsg] = useState("");
+  const hasFree = !voted && e.positions.some((p) => !isPaid(p));
   const toggle = (pid: string, cid: string, max: number) => {
     const cur = sel[pid] ?? [];
     const next = cur.includes(cid) ? cur.filter((x) => x !== cid) : max === 1 ? [cid] : cur.length < max ? [...cur, cid] : cur;
@@ -138,19 +144,27 @@ function Ballot({ d, e, onClose, onDone }: { d: DB; e: Election; onClose: () => 
           </div>
           {e.positions.map((p) => {
             const cands = d.candidacies.filter((c) => c.electionId === e.id && c.positionId === p.id && c.status === "approved");
+            const paid = isPaid(p);
+            if (!paid && voted) return null;
             return (
               <div key={p.id}>
-                <div className="mb-2 flex justify-between"><p className="font-semibold">{p.title}</p><span className="text-[12px] text-muted-foreground">Choose up to {p.maxSelections}</span></div>
-                {cands.length > 1 && <Btn variant="ghost" size="sm" onClick={() => { setCompare(cands); setCmpPos(p.id); }} className="mb-2"><Columns2 size={14} /> Compare {cands.length} nominees</Btn>}
+                <div className="mb-2 flex justify-between"><p className="font-semibold">{p.title}</p><span className={`text-[12px] ${paid ? "font-medium text-amber" : "text-muted-foreground"}`}>{paid ? `Paid · ${ghs(p.price ?? 0)} per vote` : `Choose up to ${p.maxSelections}`}</span></div>
+                {cands.length > 1 && !paid && <Btn variant="ghost" size="sm" onClick={() => { setCompare(cands); setCmpPos(p.id); }} className="mb-2"><Columns2 size={14} /> Compare {cands.length} nominees</Btn>}
                 {cands.length === 0 && <p className="text-[13px] text-muted-foreground">No candidates.</p>}
                 <div className="space-y-2">
                   {cands.map((c) => {
                     const on = sel[p.id]?.includes(c.id);
+                    const myVotes = (d.payments ?? []).filter((x) => x.candidacyId === c.id && x.voterId === me.id).reduce((s, x) => s + x.quantity, 0);
                     return (
-                      <div key={c.id}><Btn variant="ghost" aria-pressed={!!on} onClick={() => toggle(p.id, c.id, p.maxSelections)} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${on ? "border-cyan bg-cyan/10" : "border-border bg-card hover:border-cyan/40"}`}>
+                      <div key={c.id}>{paid ? (
+                        <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+                          <div className="flex-1"><NomineeDetails c={c} u={d.users.find((u) => u.id === c.userId)} compact />{myVotes > 0 && <p className="mt-1 text-[12px] text-mint">You've bought {myVotes} vote{myVotes === 1 ? "" : "s"}</p>}</div>
+                          <Btn size="sm" onClick={() => setBuy({ p, c })}>Buy votes</Btn>
+                        </div>
+                      ) : <Btn variant="ghost" aria-pressed={!!on} onClick={() => toggle(p.id, c.id, p.maxSelections)} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${on ? "border-cyan bg-cyan/10" : "border-border bg-card hover:border-cyan/40"}`}>
                         <span className={`grid size-5 place-items-center rounded-full border ${on ? "border-cyan" : "border-border"}`}>{on && <span className="size-2.5 rounded-full bg-cyan" />}</span>
                         <div className="flex-1"><NomineeDetails c={c} u={d.users.find((u) => u.id === c.userId)} compact /></div>
-                      </Btn>
+                      </Btn>}
                       <Btn variant="ghost" size="sm" onClick={() => setOpen({ ...open, [c.id]: !open[c.id] })} className="mt-1">{open[c.id] ? "Hide profile" : "View full profile"}</Btn>{open[c.id] && <div className="mt-3 border-l border-border pl-3"><NomineeDetails c={c} u={d.users.find((u) => u.id === c.userId)} /><NomineeDiscussion d={d} candidacyId={c.id} /></div>}</div>
                     );
                   })}
@@ -158,7 +172,9 @@ function Ballot({ d, e, onClose, onDone }: { d: DB; e: Election; onClose: () => 
               </div>
             );
           })}
-          <div className="flex justify-end gap-2"><Btn variant="ghost" onClick={onClose}>Cancel</Btn><Btn disabled={!Object.values(sel).some((x) => x.length)} onClick={() => setStep("review")}>Review ballot</Btn></div>
+          {paidMsg && <p className="rounded-lg border border-mint/40 bg-mint/10 p-3 text-[13px] text-mint">{paidMsg}</p>}
+          <div className="flex justify-end gap-2"><Btn variant="ghost" onClick={onClose}>{hasFree ? "Cancel" : "Done"}</Btn>{hasFree && <Btn disabled={!Object.values(sel).some((x) => x.length)} onClick={() => setStep("review")}>Review ballot</Btn>}</div>
+          {buy && <BuyVotes e={e} p={buy.p} c={buy.c} me={me} nominee={d.users.find((u) => u.id === buy.c.userId)?.name ?? "nominee"} onClose={() => setBuy(null)} onPaid={(pay) => { setBuy(null); setPaidMsg(`Payment successful · ${pay.quantity} vote${pay.quantity === 1 ? "" : "s"} added · ref ${pay.reference}`); }} />}
         </div>
       ) : (
         <div className="space-y-4">
