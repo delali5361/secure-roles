@@ -2,7 +2,12 @@ import { useSyncExternalStore } from "react";
 
 export type Role = "admin" | "voter" | "candidate";
 export type User = { id: string; name: string; email: string; phone: string; password: string; role: Role; createdAt: string };
-export type Position = { id: string; title: string; maxSelections: number };
+/** price: GHS per vote. 0/undefined = free (normal ballot). >0 = paid, voters buy any number of votes. */
+export type Position = { id: string; title: string; maxSelections: number; price?: number };
+export type Payment = { id: string; reference: string; electionId: string; positionId: string; candidacyId: string; voterId: string; quantity: number; unitPrice: number; amount: number; currency: "GHS"; method: "card" | "momo"; status: "success"; paidAt: string };
+export const MAX_VOTES_PER_PAYMENT = 1000;
+export const isPaid = (p: Position) => (p.price ?? 0) > 0;
+export const ghs = (n: number) => `GH₵ ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export type ApplicationQuestion = { id: string; label: string; required: boolean };
 export type ElectionStatus = "draft" | "open" | "closed" | "published";
 export type Election = {
@@ -27,7 +32,7 @@ export type ApplicationDraft = { electionId: string; userId: string; positionId:
 export type Comment = { id: string; candidacyId: string; userId: string; body: string; createdAt: string };
 export type Reaction = { candidacyId: string; userId: string };
 
-export type DB = { users: User[]; elections: Election[]; candidacies: Candidacy[]; votes: Vote[]; audit: AuditEntry[]; session: string | null; drafts?: ApplicationDraft[]; comments?: Comment[]; reactions?: Reaction[] };
+export type DB = { users: User[]; elections: Election[]; candidacies: Candidacy[]; votes: Vote[]; audit: AuditEntry[]; session: string | null; drafts?: ApplicationDraft[]; comments?: Comment[]; reactions?: Reaction[]; payments?: Payment[] };
 
 const KEY = "ballotglass.db.v1";
 const uid = () => Math.random().toString(36).slice(2, 10);
