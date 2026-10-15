@@ -4,6 +4,7 @@ import { Badge, Btn, Card, Empty, Field, Modal, Shell, Stat } from "@/components
 import { Results } from "@/components/Results";
 import { actions, fmt, type Candidacy, type DB, type Election, type NomineeProfile, type User } from "@/lib/store";
 import { NomineeDetails, NomineeForm, StatusTracker, validateNominee } from "@/components/Nominee";
+import { ShareLinks, nomineeUrl } from "@/components/ShareLinks";
 
 export const Route = createFileRoute("/candidate")({
   head: () => ({
@@ -62,6 +63,13 @@ function Mine({ d, me, go }: { d: DB; me: User; go: (t: string) => void }) {
                 <div className="mt-4 rounded-lg border border-border bg-background/40 p-3"><StatusTracker c={c} /></div>
                 <div className="mt-4"><NomineeDetails c={c} u={me} /></div>
                 {c.note && <p className="mt-2 text-[12px] text-amber">Reviewer note: {c.note}</p>}
+                {c.status === "approved" && e && (
+                  <div className="mt-4 rounded-lg border border-cyan/30 bg-cyan/5 p-3">
+                    <p className="label-cap">Your campaign link</p>
+                    <p className="mt-1 break-all font-mono text-[12px] text-cyan">{nomineeUrl(c.id)}</p>
+                    <div className="mt-2"><ShareLinks url={nomineeUrl(c.id)} text={`Vote for me — ${p?.title ?? ""}, ${e.title} on Ballotglass`} /></div>
+                  </div>
+                )}
                 {!locked && (
                   <div className="mt-3 flex gap-2">
                     <Btn size="sm" variant="ghost" onClick={() => { setEdit(c); setText(c.manifesto); setProf(c.profile ?? {}); }}>{c.status === "rejected" ? "Fix & resubmit" : "Edit profile"}</Btn>

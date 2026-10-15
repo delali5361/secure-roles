@@ -7,6 +7,7 @@ import { NomineeDiscussion } from "@/components/NomineeDiscussion";
 import { ArrowLeft, Columns2 } from "lucide-react";
 import { BuyVotes } from "@/components/PaidVote";
 import { actions, fmt, ghs, isPaid, type Candidacy, type DB, type Election, type Position, type User, type Vote } from "@/lib/store";
+import { ShareLinks, nomineeUrl } from "@/components/ShareLinks";
 
 /** Live countdown to the end of voting. */
 function Countdown({ endsAt }: { endsAt: string }) {
@@ -165,7 +166,7 @@ function Ballot({ d, e, me, voted, onClose, onDone }: { d: DB; e: Election; me: 
                         <span className={`grid size-5 place-items-center rounded-full border ${on ? "border-cyan" : "border-border"}`}>{on && <span className="size-2.5 rounded-full bg-cyan" />}</span>
                         <div className="flex-1"><NomineeDetails c={c} u={d.users.find((u) => u.id === c.userId)} compact /></div>
                       </Btn>}
-                      <Btn variant="ghost" size="sm" onClick={() => setOpen({ ...open, [c.id]: !open[c.id] })} className="mt-1">{open[c.id] ? "Hide profile" : "View full profile"}</Btn>{open[c.id] && <div className="mt-3 border-l border-border pl-3"><NomineeDetails c={c} u={d.users.find((u) => u.id === c.userId)} /><NomineeDiscussion d={d} candidacyId={c.id} /></div>}</div>
+                      <Btn variant="ghost" size="sm" onClick={() => setOpen({ ...open, [c.id]: !open[c.id] })} className="mt-1">{open[c.id] ? "Hide profile" : "View full profile"}</Btn>{open[c.id] && <div className="mt-3 space-y-3 border-l border-border pl-3"><NomineeDetails c={c} u={d.users.find((u) => u.id === c.userId)} /><ShareLinks url={nomineeUrl(c.id)} text={`Vote for ${c.profile?.stageName ?? d.users.find((u) => u.id === c.userId)?.name} — ${e.title} on Ballotglass`} /><NomineeDiscussion d={d} candidacyId={c.id} /></div>}</div>
                     );
                   })}
                 </div>
