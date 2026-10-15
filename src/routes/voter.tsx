@@ -206,11 +206,13 @@ function ReceiptView({ v, d }: { v: Vote; d: DB }) {
 
 function Receipts({ d, me }: { d: DB; me: User }) {
   const mine = d.votes.filter((v) => v.voterId === me.id);
+  const pays = (d.payments ?? []).filter((x) => x.voterId === me.id);
   return (
     <Card>
       <h2 className="mb-4 text-lg font-semibold">My receipts</h2>
-      {mine.length === 0 && <Empty>You haven't voted yet.</Empty>}
+      {mine.length === 0 && pays.length === 0 && <Empty>You haven't voted yet.</Empty>}
       <div className="grid gap-3 md:grid-cols-2">{mine.map((v) => <div key={v.id} className="rounded-xl border border-border bg-card p-4"><ReceiptView v={v} d={d} /></div>)}</div>
+      {pays.length > 0 && <><h3 className="mb-3 mt-6 font-semibold">Payments</h3><div className="grid gap-3 md:grid-cols-2">{pays.map((x) => { const e = d.elections.find((y) => y.id === x.electionId); const c = d.candidacies.find((y) => y.id === x.candidacyId); return <div key={x.id} className="rounded-xl border border-border bg-card p-4 text-[13px]"><div className="flex justify-between"><span className="font-mono text-cyan">{x.reference}</span><span className="font-semibold text-mint">{ghs(x.amount)}</span></div><p className="mt-1">{x.quantity} vote{x.quantity === 1 ? "" : "s"} · {d.users.find((u) => u.id === c?.userId)?.name}</p><p className="text-muted-foreground">{e?.title} · {x.method === "momo" ? "Mobile Money" : "Card"} · {fmt(x.paidAt)}</p></div>; })}</div></>}
     </Card>
   );
 }
