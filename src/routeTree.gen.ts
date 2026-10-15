@@ -14,6 +14,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CandidateRouteImport } from './routes/candidate'
 import { Route as VoterRouteImport } from './routes/voter'
+import { Route as VoteCandidacyIdRouteImport } from './routes/vote.$candidacyId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,6 +41,11 @@ const VoterRoute = VoterRouteImport.update({
   path: '/voter',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VoteCandidacyIdRoute = VoteCandidacyIdRouteImport.update({
+  id: '/vote/$candidacyId',
+  path: '/vote/$candidacyId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/candidate': typeof CandidateRoute
   '/voter': typeof VoterRoute
+  '/vote/$candidacyId': typeof VoteCandidacyIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/candidate': typeof CandidateRoute
   '/voter': typeof VoterRoute
+  '/vote/$candidacyId': typeof VoteCandidacyIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +70,22 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/candidate': typeof CandidateRoute
   '/voter': typeof VoterRoute
+  '/vote/$candidacyId': typeof VoteCandidacyIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/auth' | '/candidate' | '/voter'
+  fullPaths:
+    '/' | '/admin' | '/auth' | '/candidate' | '/voter' | '/vote/$candidacyId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/auth' | '/candidate' | '/voter'
-  id: '__root__' | '/' | '/admin' | '/auth' | '/candidate' | '/voter'
+  to: '/' | '/admin' | '/auth' | '/candidate' | '/voter' | '/vote/$candidacyId'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/candidate'
+    | '/voter'
+    | '/vote/$candidacyId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,6 +94,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CandidateRoute: typeof CandidateRoute
   VoterRoute: typeof VoterRoute
+  VoteCandidacyIdRoute: typeof VoteCandidacyIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -116,6 +134,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VoterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/vote/$candidacyId': {
+      id: '/vote/$candidacyId'
+      path: '/vote/$candidacyId'
+      fullPath: '/vote/$candidacyId'
+      preLoaderRoute: typeof VoteCandidacyIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -125,6 +150,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CandidateRoute: CandidateRoute,
   VoterRoute: VoterRoute,
+  VoteCandidacyIdRoute: VoteCandidacyIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
