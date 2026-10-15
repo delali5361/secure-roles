@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Badge, Bar, Btn, Card, Empty, Field, Modal, Shell, Stat } from "@/components/ui-kit";
 import { Results } from "@/components/Results";
 import { NomineeDetails } from "@/components/Nominee";
-import { actions, fmt, newId, type ApplicationQuestion, type DB, type Election, type ElectionStatus, type Position } from "@/lib/store";
+import { actions, fmt, newId, type ApplicationQuestion, type DB, type Election, type ElectionStatus, type Position, ghs, revenue } from "@/lib/store";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/admin")({
 
 const tabs = [
   { id: "overview", label: "Overview" }, { id: "elections", label: "Elections" }, { id: "candidates", label: "Candidates" },
-  { id: "users", label: "Users" }, { id: "results", label: "Results" }, { id: "audit", label: "Audit" },
+  { id: "users", label: "Users" }, { id: "results", label: "Results" }, { id: "payments", label: "Payments" }, { id: "audit", label: "Audit" },
 ];
 
 function AdminPage() {
@@ -34,6 +34,7 @@ function AdminPage() {
           {tab === "users" && <Users d={d} />}
           {tab === "results" && <ResultsTab d={d} />}
           {tab === "audit" && <Audit d={d} />}
+          {tab === "payments" && <Payments d={d} />}
         </>
       )}
     </Shell>
@@ -178,12 +179,13 @@ function ElectionForm({ initial, onClose }: { initial: Election | null; onClose:
           ))}
         </div>
         <div>
-          <p className="label-cap mb-2">Positions</p>
+          <p className="label-cap mb-2">Positions · max picks · price per vote (GH₵, 0 = free)</p>
           <div className="space-y-2">
             {positions.map((p, i) => (
               <div key={p.id} className="flex gap-2">
                 <input className="field" placeholder="Position title" value={p.title} onChange={(e) => setPositions(positions.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))} />
-                <input type="number" min={1} className="field w-24" title="Max selections" value={p.maxSelections} onChange={(e) => setPositions(positions.map((x, j) => (j === i ? { ...x, maxSelections: Math.max(1, +e.target.value) } : x)))} />
+                <input type="number" min={1} className="field w-20" title="Max selections" value={p.maxSelections} onChange={(e) => setPositions(positions.map((x, j) => (j === i ? { ...x, maxSelections: Math.max(1, +e.target.value) } : x)))} />
+                <input type="number" min={0} step="0.5" className="field w-28" title="Price per vote (GH₵, 0 = free)" placeholder="GH₵ / vote" value={p.price ?? 0} onChange={(e) => setPositions(positions.map((x, j) => (j === i ? { ...x, price: Math.max(0, +e.target.value || 0) } : x)))} />
                 <Btn variant="ghost" onClick={() => setPositions(positions.filter((_, j) => j !== i))}>✕</Btn>
               </div>
             ))}
@@ -287,5 +289,28 @@ function Audit({ d }: { d: DB }) {
         ))}
       </div>
     </Card>
+  );
+}
+
+function Payments({ d }: { d: DB }) {
+  const pays = [...(d.payments ?? [])].reverse();
+  const votes = pays.reduce((s, p) => s + p.quantity, 0);
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Stat label="Total collected" value={ghs(revenue(d))} hint="Simulated Paystack" />
+        <Stat label="Paid votes" value={votes} hint={`${pays.length} payments`} tone="cyan" />
+        <Stat label="Paying voters" value={new Set(pays.map((p) => p.voterId)).size} hint="Unique accounts" tone="amber" />
+      </div>
+      <Card>
+        <h2 className="mb-4 text-lg font-semibold">Transactions</h2>
+        {pays.length === 0 && <Empty>No payments yet. Set a price on a category to enable paid voting.</Empty>}
+        <div className="overflow-x-auto"><table className="w-full text-[13px]">
+          {pays.length > 0 && <thead><tr className="label-cap text-left"><th className="pb-3">Reference</th><th className="pb-3">Voter</th><th className="pb-3">Nominee</th><th className="pb-3">Votes</th><th className="pb-3">Amount</th><th className="pb-3">Method</th><th className="pb-3">Date</th></tr></thead>}
+          <tbody>{pays.map((p) => { const c = d.candidacies.find((x) => x.id === p.candidacyId); return (
+            <tr key={p.id} className="border-t border-border"><td className="py-3 font-mono text-cyan">{p.reference}</td><td>{d.users.find((u) => u.id === p.voterId)?.name ?? "—"}</td><td>{d.users.find((u) => u.id === c?.userId)?.name ?? "—"}</td><td>{p.quantity}</td><td className="font-semibold text-mint">{ghs(p.amount)}</td><td>{p.method === "momo" ? "MoMo" : "Card"}</td><td className="text-muted-foreground">{fmt(p.paidAt)}</td></tr>); })}</tbody>
+        </table></div>
+      </Card>
+    </div>
   );
 }
