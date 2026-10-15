@@ -27,9 +27,9 @@ function NomineeSharePage() {
   if (!d) return <div className="grid min-h-screen place-items-center bg-stage text-muted-foreground">Loading…</div>;
 
   const c = d.candidacies.find((x) => x.id === candidacyId && x.status === "approved");
-  const e = c && d.elections.find((x) => x.id === c.electionId);
-  const p = e?.positions.find((x) => x.id === c.positionId);
-  const u = c && d.users.find((x) => x.id === c.userId);
+  const e = c ? d.elections.find((x) => x.id === c.electionId) : undefined;
+  const p = c ? e?.positions.find((x) => x.id === c.positionId) : undefined;
+  const u = c ? d.users.find((x) => x.id === c.userId) : undefined;
   const me = currentUser(d);
 
   if (!c || !e || !p || !u) {
