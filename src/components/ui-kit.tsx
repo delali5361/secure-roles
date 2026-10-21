@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, type ReactNode, type ButtonHTMLAttributes } from "react";
+import { Menu, X } from "lucide-react";
+import { useEffect, useState, type ReactNode, type ButtonHTMLAttributes } from "react";
 import { actions, currentUser, dashFor, useDB, type DB, type Role, type User } from "@/lib/store";
 
 type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "brand" | "ghost" | "danger" | "soft"; size?: "sm" | "md" };
@@ -88,6 +89,10 @@ export function Shell({ role, tabs, tab, onTab, children }: { role: Role; tabs: 
   const d = useDB();
   const me = currentUser(d);
   const nav = useNavigate();
+  const sidebar = role === "admin" || role === "voter" || role === "candidate";
+  const sectionLabel = role === "admin" ? "Administration" : `${role[0].toUpperCase()}${role.slice(1)} dashboard`;
+  const navigationLabel = `${role[0].toUpperCase()}${role.slice(1)} dashboard`;
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   useEffect(() => {
     if (!d) return;
     if (!me) nav({ to: "/auth", replace: true });
@@ -98,22 +103,132 @@ export function Shell({ role, tabs, tab, onTab, children }: { role: Role; tabs: 
 
   return (
     <div className="min-h-screen w-full bg-stage">
-      <div className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6">
-        <header className="glass flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+      {sidebar && (
+        <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 flex-col border-r border-border bg-background/90 px-5 py-6 backdrop-blur md:flex">
           <Logo />
-          <nav className="flex flex-wrap items-center gap-1 rounded-full border border-border bg-card p-1">
+          <p className="label-cap mt-10 px-3">{sectionLabel}</p>
+          <nav aria-label={navigationLabel} className="mt-3 flex flex-1 flex-col gap-1">
             {tabs.map((t) => (
-              <button key={t.id} onClick={() => onTab(t.id)} className={`rounded-full px-4 py-1.5 text-[13px] transition ${tab === t.id ? "bg-brand font-semibold text-primary-foreground" : "font-medium text-muted-foreground hover:text-foreground"}`}>{t.label}</button>
+              <button
+                key={t.id}
+                type="button"
+                aria-current={tab === t.id ? "page" : undefined}
+                onClick={() => onTab(t.id)}
+                className={`w-full rounded-lg px-3 py-2.5 text-left text-[13px] transition ${
+                  tab === t.id
+                    ? "bg-brand font-semibold text-primary-foreground"
+                    : "font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
+              >
+                {t.label}
+              </button>
             ))}
           </nav>
+          <div className="border-t border-border pt-4">
+            <p className="truncate px-3 text-[12px] text-muted-foreground">{me.email}</p>
+            <Btn
+              className="mt-3 w-full"
+              variant="ghost"
+              size="sm"
+              onClick={() => { actions.logout(); nav({ to: "/auth", replace: true }); }}
+            >
+              Sign out
+            </Btn>
+          </div>
+        </aside>
+      )}
+      <div className={`mx-auto max-w-[1440px] px-4 py-6 sm:px-6 ${sidebar ? "md:ml-60" : ""}`}>
+        <header className="glass flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+          {!sidebar && <Logo />}
+          {sidebar && (
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                aria-label={`Open ${role} navigation`}
+                aria-expanded={mobileNavOpen}
+                onClick={() => setMobileNavOpen(true)}
+                className="grid size-9 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-accent hover:text-foreground md:hidden"
+              >
+                <Menu size={18} />
+              </button>
+              <h1 className="font-display text-lg font-semibold">{tabs.find((t) => t.id === tab)?.label ?? sectionLabel}</h1>
+            </div>
+          )}
+          {!sidebar && (
+            <nav className="flex flex-wrap items-center gap-1 rounded-full border border-border bg-card p-1">
+              {tabs.map((t) => (
+                <button key={t.id} onClick={() => onTab(t.id)} className={`rounded-full px-4 py-1.5 text-[13px] transition ${tab === t.id ? "bg-brand font-semibold text-primary-foreground" : "font-medium text-muted-foreground hover:text-foreground"}`}>{t.label}</button>
+              ))}
+            </nav>
+          )}
           <div className="flex items-center gap-3">
             <div className="hidden rounded-full border border-border bg-card px-3 py-1.5 text-[12px] text-muted-foreground sm:block">
               <span className="capitalize">{me.role}</span> · <span className="text-foreground">{me.email}</span>
             </div>
             <div className="grid size-9 place-items-center rounded-full bg-brand-diag text-[12px] font-bold text-primary-foreground">{me.name.split(" ").map((x) => x[0]).join("").slice(0, 2)}</div>
-            <Btn variant="ghost" size="sm" onClick={() => { actions.logout(); nav({ to: "/auth", replace: true }); }}>Sign out</Btn>
+            <Btn className={sidebar ? "md:hidden" : ""} variant="ghost" size="sm" onClick={() => { actions.logout(); nav({ to: "/auth", replace: true }); }}>Sign out</Btn>
           </div>
         </header>
+        {sidebar && mobileNavOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-background/70 backdrop-blur-sm md:hidden"
+            onClick={() => setMobileNavOpen(false)}
+          >
+            <aside
+              aria-label={`${navigationLabel} navigation`}
+              className="absolute inset-y-0 left-0 flex w-64 max-w-[85vw] flex-col border-r border-border bg-background p-5 shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <Logo />
+                <button
+                  type="button"
+                  aria-label={`Close ${role} navigation`}
+                  onClick={() => setMobileNavOpen(false)}
+                  className="grid size-9 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <p className="label-cap mt-10 px-3">{sectionLabel}</p>
+              <nav aria-label={navigationLabel} className="mt-3 flex flex-1 flex-col gap-1">
+                {tabs.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    aria-current={tab === t.id ? "page" : undefined}
+                    onClick={() => {
+                      onTab(t.id);
+                      setMobileNavOpen(false);
+                    }}
+                    className={`w-full rounded-lg px-3 py-2.5 text-left text-[13px] transition ${
+                      tab === t.id
+                        ? "bg-brand font-semibold text-primary-foreground"
+                        : "font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </nav>
+              <div className="border-t border-border pt-4">
+                <p className="truncate px-3 text-[12px] text-muted-foreground">{me.email}</p>
+                <Btn
+                  className="mt-3 w-full"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setMobileNavOpen(false);
+                    actions.logout();
+                    nav({ to: "/auth", replace: true });
+                  }}
+                >
+                  Sign out
+                </Btn>
+              </div>
+            </aside>
+          </div>
+        )}
         <main className="mt-7 animate-in fade-in slide-in-from-bottom-2 duration-500">{children(d, me)}</main>
       </div>
     </div>
