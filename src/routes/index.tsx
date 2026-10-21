@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, ArrowRight, Check, ChevronDown, Vote, Smartphone, Trophy, Users, ShieldCheck, Globe, Menu, X } from "lucide-react";
+import { ArrowUpRight, ArrowRight, Check, ChevronDown, Vote, Smartphone, Trophy, Users, ShieldCheck, Globe, Menu, X, LayoutDashboard } from "lucide-react";
 import { useState } from "react";
 import { Btn } from "@/components/ui-kit";
 import { currentUser, dashFor, useDB } from "@/lib/store";
@@ -27,12 +27,39 @@ function Home() {
   const d = useDB(); const me = currentUser(d);
   const [menu, setMenu] = useState(false);
   const destination = me ? dashFor(me.role) : "/auth";
-  return <div className="landing bg-background text-foreground">
+  return <div className="landing min-h-screen bg-background text-foreground">
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-border bg-background px-6 py-8 md:flex">
+      <p className="label-cap">Your space</p>
+      <nav aria-label="Account navigation" className="mt-5 flex flex-col gap-3">
+        <Link to={destination} className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 text-sm font-medium transition hover:border-mint/50 hover:text-mint">
+          <LayoutDashboard size={17} /> {me ? "My dashboard" : "Dashboard"}
+        </Link>
+        <Link to={destination} className="landing-cta w-full justify-between">
+          Get started <ArrowUpRight size={16} />
+        </Link>
+      </nav>
+    </aside>
+    <div className="md:ml-60">
     <header className="border-b border-border"><div className="landing-width flex h-20 items-center justify-between gap-6">
       <Link to="/" className="flex items-center gap-2.5 font-display text-xl font-semibold"><span className="grid size-9 place-items-center rounded-lg bg-mint text-background"><Vote size={22} strokeWidth={2} /></span>ballotglass<span className="text-mint">.</span></Link>
       <nav className="hidden items-center gap-8 text-[13px] text-muted-foreground md:flex"><a href="#possibilities" className="transition hover:text-foreground">What’s possible</a><a href="#how-it-works" className="transition hover:text-foreground">How it works</a><a href="#questions" className="transition hover:text-foreground">FAQs</a></nav>
-      <div className="flex items-center gap-5"><Link to={destination} className="hidden text-[13px] sm:block">{me ? "My dashboard" : "Sign in"}</Link><Link to={destination} className="landing-cta text-[13px]">Get started <ArrowUpRight size={16} /></Link><Btn variant="ghost" size="sm" className="md:hidden" aria-label={menu ? "Close navigation" : "Open navigation"} onClick={() => setMenu(!menu)}>{menu ? <X size={18} /> : <Menu size={18} />}</Btn></div>
-    </div>{menu && <nav className="landing-width flex flex-col gap-4 pb-5 text-sm md:hidden">{[["#possibilities", "What’s possible"], ["#how-it-works", "How it works"], ["#questions", "FAQs"]].map(([href, label]) => <a key={href} href={href} onClick={() => setMenu(false)}>{label}</a>)}</nav>}</header>
+      <Btn variant="ghost" size="sm" className="md:hidden" aria-label={menu ? "Close navigation" : "Open navigation"} onClick={() => setMenu(!menu)}>{menu ? <X size={18} /> : <Menu size={18} />}</Btn>
+    </div>{menu && <div className="fixed inset-0 z-40 bg-background/70 md:hidden" onClick={() => setMenu(false)}>
+      <nav aria-label="Mobile navigation" className="absolute inset-y-0 right-0 flex w-72 max-w-[85vw] flex-col gap-5 border-l border-border bg-background p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <span className="label-cap">Your space</span>
+          <Btn variant="ghost" size="sm" aria-label="Close navigation" onClick={() => setMenu(false)}><X size={18} /></Btn>
+        </div>
+        <Link to={destination} onClick={() => setMenu(false)} className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 text-sm font-medium">
+          <LayoutDashboard size={17} /> {me ? "My dashboard" : "Dashboard"}
+        </Link>
+        <Link to={destination} onClick={() => setMenu(false)} className="landing-cta w-full justify-between">
+          Get started <ArrowUpRight size={16} />
+        </Link>
+        <div className="my-1 border-t border-border" />
+        {[["#possibilities", "What’s possible"], ["#how-it-works", "How it works"], ["#questions", "FAQs"]].map(([href, label]) => <a key={href} href={href} onClick={() => setMenu(false)} className="text-sm text-muted-foreground hover:text-foreground">{label}</a>)}
+      </nav>
+    </div>}</header>
     <main>
       <section className="landing-hero relative isolate overflow-hidden">
         <img src={community} alt="Students coming together to cast a ballot on campus" width={1920} height={1088} fetchPriority="high" className="absolute inset-0 -z-20 h-full w-full object-cover" />
@@ -53,5 +80,6 @@ function Home() {
       <section className="border-t border-border"><div className="landing-width flex flex-wrap items-center justify-between gap-6 py-14"><div><p className="text-xs text-mint">THE NEXT CHAPTER IS YOURS</p><h2 className="mt-3 text-3xl font-medium">Let’s make it count.</h2></div><Link to={destination} className="landing-cta">Join Ballotglass <ArrowUpRight size={18} /></Link></div></section>
     </main>
     <footer className="border-t border-border"><div className="landing-width flex flex-wrap items-center justify-between gap-4 py-6 text-xs text-muted-foreground"><Link to="/" className="font-display text-base text-foreground">ballotglass<span className="text-mint">.</span></Link><p>© {new Date().getFullYear()} Ballotglass</p><span className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-amber" /> Local demo · saved in this browser</span></div></footer>
+    </div>
   </div>;
 }
